@@ -183,7 +183,11 @@ async function searchByTitle(base, headers, title, year, type) {
     for (const item of data.Items) {
       if (!titleSimilarMatch(normalize(item.Name || ""), target)) continue;
       const y = extractYear(item);
-      if (year && y && y !== year) continue;
+      if (year && y && y !== year) {
+        // Allow ±2 year tolerance (TV series often have mismatched premiere dates)
+        const tolerance = Math.abs(y - year) <= 2;
+        if (!tolerance) continue;
+      }
       return item;
     }
   } catch { return null; }
