@@ -1,0 +1,11 @@
+{
+  "jellyfin_urls": [
+    "http://localhost:8096"
+  ],
+  "jellyfin_api_key": "",
+  "telegram_bot_token": "",
+  "telegram_chat_id": "",
+  "language": "en",
+  "enable_request_button": false,
+  "enable_sound_notifications": false
+}
