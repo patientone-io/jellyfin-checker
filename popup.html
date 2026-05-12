@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      width: 320px;
+      min-height: auto;
+    }
+    
+    .header {
+      background: #1e293b;
+      padding: 16px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    
+    .logo {
+      width: 28px;
+      height: 28px;
+    }
+    
+    .header-text {
+      font-size: 16px;
+      font-weight: 600;
+    }
+    
+    .content {
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    .label {
+      font-size: 11px;
+      font-weight: 500;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    
+    .input {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+    
+    .input:focus {
+      outline: none;
+      border-color: #0082C8;
+      box-shadow: 0 0 0 2px rgba(0, 130, 200, 0.3);
+    }
+    
+    .button {
+      flex: 1;
+      font-weight: 600;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: filter 0.2s;
+    }
+    
+    .button:hover {
+      filter: brightness(1.15);
+    }
+    
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .button-group {
+      display: flex;
+      gap: 8px;
+    }
+    
+    .status {
+      font-size: 12px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      display: none;
+    }
+    
+    .status.success {
+      background: #064e3b;
+      color: #6ee7b7;
+      display: block;
+    }
+    
+    .status.error {
+      background: #7f1d1d;
+      color: #fca5a5;
+      display: block;
+    }
+    
+    .status.info {
+      background: #1e3a8a;
+      color: #93c5fd;
+      display: block;
+    }
+    
+    .footer {
+      padding: 12px 16px;
+      border-top: 1px solid #334155;
+      font-size: 11px;
+      color: #64748b;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+    <div class="header">
+      <img class="logo" src="icon96.png" alt="Jellyfin">
+      <div class="header-text">Jellyfin Checker</div>
+      <div style="margin-left:auto;display:flex;gap:2px;">
+        <button id="lang-pl" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;font-weight:600;padding:4px 6px;border-radius:4px;" title="Polski">PL</button>
+        <button id="lang-en" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;font-weight:600;padding:4px 6px;border-radius:4px;" title="English">EN</button>
+      </div>
+  </div>
+  
+  <div class="content">
+    <div class="field">
+      <label class="label" data-i18n="urlLabel">Jellyfin URL #1</label>
+      <input type="text" id="jellyfin-url" class="input" placeholder="http://localhost:8096">
+    </div>
+    <div class="field">
+      <label class="label" data-i18n="urlLabelExt">Jellyfin URL #2</label>
+      <input type="text" id="jellyfin-url-external" class="input" placeholder="https://jellyfin.example.com">
+      <p class="hint" id="hint-api">Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada</p>
+    </div>
+    
+    <div class="field">
+      <label class="label" data-i18n="keyLabel">API Key</label>
+      <input type="password" id="jellyfin-api-key" class="input" placeholder="••••••••">
+    </div>
+    
+    <div class="button-group">
+      <button id="save-btn" class="button" style="background:#0082C8;color:#fff">Save</button>
+      <button id="test-btn" class="button" style="background:#A30C6B;color:#fff">Test</button>
+    </div>
+    
+    <div id="status" class="status"></div>
+    
+    <div id="config-info" style="font-size: 11px; color: #64748b; margin-top: 8px;">
+      <strong>How to get API key:</strong><br>
+      Jellyfin Dashboard → Settings → API Keys → Add API Key
+    </div>
+
+    <div style="border-top:1px solid #334155;margin:12px 0 8px;padding-top:12px;text-align:center;">
+      <a href="#" id="open-options" style="color:#0082C8;font-size:12px;text-decoration:none;font-weight:600;" data-i18n="settingsLink">Full settings</a>
+    </div>
+  </div>
+  
+  <div class="footer">
+    Jellyfin Checker v0.7.1 • Supports IMDb, Filmweb, TMDb
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

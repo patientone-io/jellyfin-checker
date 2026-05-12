@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+  <meta charset="utf-8">
+  <title>Jellyfin Checker — Ustawienia</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 40px 20px;
+    }
+    h1 {
+      font-size: 24px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; }
+    .card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 24px;
+      width: 100%;
+      max-width: 520px;
+      margin-bottom: 20px;
+    }
+    .card h2 {
+      font-size: 16px;
+      margin-bottom: 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #334155;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .field { margin-bottom: 14px; }
+    .label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 4px;
+      display: block;
+    }
+    .input {
+      width: 100%;
+      background: #0f172a;
+      border: 1px solid #334155;
+      color: #e2e8f0;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      transition: border-color .2s, box-shadow .2s;
+    }
+    .input:focus {
+      outline: none;
+      border-color: #0082C8;
+      box-shadow: 0 0 0 3px rgba(0, 130, 200, 0.2);
+    }
+    .input::placeholder { color: #475569; }
+    .button-group { display: flex; gap: 10px; margin-top: 16px; }
+    .button {
+      flex: 1;
+      font-weight: 600;
+      border: none;
+      padding: 10px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+      transition: filter .2s;
+    }
+    .button:hover { filter: brightness(1.15); }
+    .button-primary { background: #0082C8; color: #fff; }
+    .button-secondary { background: #A30C6B; color: #fff; }
+    .button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+    .status {
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-top: 12px;
+      display: none;
+    }
+    .status.visible { display: block; }
+    .status.success { background: #064e3b; color: #6ee7b7; }
+    .status.error { background: #7f1d1d; color: #fca5a5; }
+    .hint { font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.5; }
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0;
+    }
+    .toggle-label { font-size: 14px; }
+    .toggle-sub { font-size: 12px; color: #64748b; }
+    .switch {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #475569;
+      border-radius: 24px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 18px;
+      height: 18px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .switch input:checked + .slider { background: #15803d; }
+    .switch input:checked + .slider:before { transform: translateX(20px); }
+    .lang-toggle {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 4px;
+    }
+    .lang-btn {
+      background: none;
+      border: 1px solid #334155;
+      color: #94a3b8;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      transition: all .2s;
+    }
+    .lang-btn.active {
+      border-color: #0082C8;
+      color: #e2e8f0;
+      background: rgba(0, 130, 200, 0.1);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="lang-toggle">
+    <button class="lang-btn" id="lang-pl">PL</button>
+    <button class="lang-btn" id="lang-en">EN</button>
+  </div>
+
+  <h1><img src="icon96.png" width="32" height="32" alt=""> Jellyfin Checker</h1>
+  <p class="subtitle" id="subtitle">Konfiguracja rozszerzenia</p>
+
+  <div class="card">
+    <h2 data-i18n="headingServer">🎬 Jellyfin Server</h2>
+    <div class="field">
+      <label class="label" data-i18n="urlLabel">Jellyfin URL #1</label>
+      <input type="text" id="jellyfin-url" class="input" placeholder="http://localhost:8096">
+    </div>
+    <div class="field">
+      <label class="label" data-i18n="urlLabelExt">Jellyfin URL #2</label>
+      <input type="text" id="jellyfin-url-external" class="input" placeholder="https://jellyfin.example.com">
+      <p class="hint" id="hint-api">Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada</p>
+    </div>
+    <div class="field">
+      <label class="label" data-i18n="keyLabel">Klucz API</label>
+      <input type="password" id="jellyfin-api-key" class="input" placeholder="••••••••">
+      <p class="hint" id="hint-key">Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz</p>
+    </div>
+    <div class="button-group">
+      <button id="save-btn" class="button button-primary">Zapisz</button>
+      <button id="test-btn" class="button button-secondary">Test</button>
+    </div>
+    <div id="status-jf" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="headingTelegram">📢 Telegram — Prośby o dodanie</h2>
+    <div class="field">
+      <label class="label" data-i18n="labelBotToken">Bot Token</label>
+      <input type="password" id="telegram-bot-token" class="input" placeholder="123456:ABC-DEF...">
+      <p class="hint" id="hint-bot">Stwórz bota przez @BotFather → /newbot</p>
+    </div>
+    <div class="field">
+      <label class="label" data-i18n="labelChatId">Chat ID</label>
+      <input type="text" id="telegram-chat-id" class="input" placeholder="-1001234567890">
+      <p class="hint" id="hint-chat">ID Twojego czatu lub grupy (np. <code>-1001234567890</code> dla grupy)</p>
+    </div>
+    <div class="button-group">
+      <button id="save-tg-btn" class="button button-primary">Zapisz</button>
+      <button id="test-tg-btn" class="button button-secondary">Test Telegram</button>
+    </div>
+    <div id="status-tg" class="status"></div>
+  </div>
+
+  <div class="card">
+    <h2 data-i18n="headingSettings">🌍 Ustawienia</h2>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label" id="toggle-notif-label">Powiadomienia dźwiękowe</div>
+        <div class="toggle-sub" id="toggle-notif-sub">Piszcz przy znalezieniu filmu</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle-sound">
+        <span class="slider"></span>
+      </label>
+    </div>
+    <div class="toggle-row">
+      <div>
+        <div class="toggle-label" id="toggle-request-label">Przycisk "Poproś o dodanie"</div>
+        <div class="toggle-sub" id="toggle-request-sub">Pokazuj gdy film nie jest na Jellyfin</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle-request">
+        <span class="slider"></span>
+      </label>
+    </div>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>
