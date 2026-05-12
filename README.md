@@ -30,7 +30,7 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 2. The extension searches your Jellyfin library via API
 3. A badge appears in the top-right corner with the result
 
-![Badge](screenshots/badge-en.png)
+![Badge](src/screenshots/badge-en.png)
 
 #### Badge states
 
@@ -46,7 +46,7 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 
 | Popup | Options |
 |-------|---------|
-| ![Popup](screenshots/popup-en.png) | ![Options](screenshots/options-en.png) |
+| ![Popup](src/screenshots/popup-en.png) | ![Options](src/screenshots/options-en.png) |
 
 #### Search strategy
 
@@ -181,7 +181,7 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 2. Rozszerzenie automatycznie przeszukuje Twoją bibliotekę Jellyfin przez API
 3. W prawym górnym rogu pojawia się badge z wynikiem
 
-![Badge](screenshots/badge-pl.png)
+![Badge](src/screenshots/badge-pl.png)
 
 #### Stany badge'a
 
@@ -197,7 +197,7 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 
 | Popup | Ustawienia |
 |-------|------------|
-| ![Popup](screenshots/popup-pl.png) | ![Ustawienia](screenshots/options-pl.png) |
+| ![Popup](src/screenshots/popup-pl.png) | ![Ustawienia](src/screenshots/options-pl.png) |
 
 #### Strategia wyszukiwania
 
