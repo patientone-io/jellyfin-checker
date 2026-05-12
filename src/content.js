@@ -246,7 +246,7 @@ function extractFilmweb(filmwebId) {
   if (y) {
     const m = y.textContent.match(/(\d{4})/);
     if (m) year = parseInt(m[1]);
-    const origMatch = y.textContent.match(/^(.+?)\s*\(\d{4}\)/);
+    const origMatch = y.textContent.match(/^([\s\S]+?)[\s(]*(\d{4})/);
     if (origMatch) {
       originalTitle = origMatch[1].trim();
       if (t && originalTitle === t.textContent.trim()) originalTitle = null;
