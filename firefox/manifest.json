@@ -1,26 +1,25 @@
 {
-  "manifest_version": 3,
+  "manifest_version": 2,
   "name": "Jellyfin Checker",
-  "version": "0.7.1",
+  "version": "0.7.4",
   "author": "patientone",
   "description": "Check if movies, shows, or people are available on your Jellyfin server",
   "permissions": [
     "storage",
-    "activeTab"
-  ],
-  "host_permissions": [
-    "http://*/*",
-    "https://*/*"
+    "activeTab",
+    "notifications",
+    "<all_urls>"
   ],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["background.js"],
+    "persistent": false
   },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
-  "action": {
+  "browser_action": {
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
@@ -31,14 +30,6 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
-  },
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "jellyfin-checker@patientone",
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
-    }
   },
   "content_scripts": [
     {
@@ -67,5 +58,11 @@
       ],
       "run_at": "document_idle"
     }
-  ]
+  ],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "jellyfin-checker@patientone",
+      "strict_min_version": "109.0"
+    }
+  }
 }
