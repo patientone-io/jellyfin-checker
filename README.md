@@ -58,13 +58,20 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 
 ### Installation
 
-1. Download or clone this repository
-2. Open your browser's extensions page:
-   - Chrome: `chrome://extensions`
-   - Edge: `edge://extensions`
-   - Brave: `brave://extensions`
-3. Enable **Developer mode**
-4. Click **Load unpacked** → select the `jellyfin-checker-public` folder
+1. Clone this repository: `git clone https://github.com/patientone-io/jellyfin-checker.git`
+2. Build for your browser:
+   ```bash
+   cd jellyfin-checker
+   bash build.sh chrome    # for Chrome / Edge / Brave
+   bash build.sh firefox   # for Firefox
+   ```
+3. Open your browser's extensions page:
+   - **Chrome**: `chrome://extensions`
+   - **Edge**: `edge://extensions`
+   - **Brave**: `brave://extensions`
+   - **Firefox**: `about:debugging#/runtime/this-firefox`
+4. Enable **Developer mode** (Chrome/Edge/Brave)
+5. Click **Load unpacked** → select the `dist/chrome` or `dist/firefox` folder
 
 ### Configuration
 
@@ -100,23 +107,27 @@ Built for household members — when someone finds a movie that's not on your Je
 ### File structure
 
 ```
-jellyfin-checker-public/
-├── manifest.json       # Manifest V3
-├── background.js       # Service worker — Jellyfin API logic
-├── content.js          # Metadata extraction + badge UI
-├── popup.html          # Configuration popup
-├── popup.js            # Popup logic (i18n, save, test)
-├── options.html        # Full settings page
-├── options.js          # Settings logic
-├── config.json         # Default config (no secrets)
-├── icon16.png          # 16×16 icon
-├── icon48.png          # 48×48 icon
-├── icon96.png          # 96×96 icon
-├── icon128.png         # 128×128 icon
-├── screenshots/        # Preview images
-│   ├── badge-en.png
-│   ├── popup-en.png
-│   └── options-en.png
+jellyfin-checker/
+├── src/                # Shared source files (same for all browsers)
+│   ├── background.js   # Service worker / Event page — Jellyfin API logic
+│   ├── content.js      # Metadata extraction + badge UI
+│   ├── popup.html      # Configuration popup
+│   ├── popup.js        # Popup logic (i18n, save, test)
+│   ├── options.html    # Full settings page
+│   ├── options.js      # Settings logic
+│   ├── config.json     # Default config (no secrets)
+│   ├── icon16.png      # 16×16 icon
+│   ├── icon48.png      # 48×48 icon
+│   ├── icon96.png      # 96×96 icon
+│   ├── icon128.png     # 128×128 icon
+│   └── screenshots/    # Preview images
+├── chrome/
+│   └── manifest.json   # Chrome manifest (MV3, service_worker)
+├── firefox/
+│   └── manifest.json   # Firefox manifest (MV3, scripts, options_ui)
+├── build.sh            # Build script — run: bash build.sh <chrome|firefox>
+├── .gitignore
+├── LICENSE
 └── README.md           # This file
 ```
 
@@ -198,13 +209,20 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 
 ### Instalacja
 
-1. Pobierz lub sklonuj to repozytorium
-2. Otwórz stronę rozszerzeń:
-   - Chrome: `chrome://extensions`
-   - Edge: `edge://extensions`
-   - Brave: `brave://extensions`
-3. Włącz **Tryb programisty** (przełącznik w prawym górnym rogu)
-4. Kliknij **Wczytaj rozpakowane** → wybierz folder `jellyfin-checker-public`
+1. Sklonuj repozytorium: `git clone https://github.com/patientone-io/jellyfin-checker.git`
+2. Zbuduj dla swojej przeglądarki:
+   ```bash
+   cd jellyfin-checker
+   bash build.sh chrome    # dla Chrome / Edge / Brave
+   bash build.sh firefox   # dla Firefox
+   ```
+3. Otwórz stronę rozszerzeń:
+   - **Chrome**: `chrome://extensions`
+   - **Edge**: `edge://extensions`
+   - **Brave**: `brave://extensions`
+   - **Firefox**: `about:debugging#/runtime/this-firefox`
+4. Włącz **Tryb programisty** (Chrome/Edge/Brave)
+5. Kliknij **Wczytaj rozpakowane** → wybierz folder `dist/chrome` lub `dist/firefox`
 
 ### Konfiguracja
 
@@ -240,23 +258,27 @@ Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Fi
 ### Struktura plików
 
 ```
-jellyfin-checker-public/
-├── manifest.json       # Manifest V3
-├── background.js       # Service worker — logika API Jellyfin
-├── content.js          # Ekstrakcja metadanych + badge UI
-├── popup.html          # Konfiguracja (popup)
-├── popup.js            # Obsługa popupu (i18n, zapis, test)
-├── options.html        # Pełne ustawienia
-├── options.js          # Logika ustawień
-├── config.json         # Domyślna konfiguracja (bez sekretów)
-├── icon16.png          # Ikona 16×16
-├── icon48.png          # Ikona 48×48
-├── icon96.png          # Ikona 96×96
-├── icon128.png         # Ikona 128×128
-├── screenshots/        # Podglądy
-│   ├── badge-pl.png
-│   ├── popup-pl.png
-│   └── options-pl.png
+jellyfin-checker/
+├── src/                # Współdzielone pliki źródłowe (takie same dla obu przeglądarek)
+│   ├── background.js   # Service worker / Event page — logika API Jellyfin
+│   ├── content.js      # Ekstrakcja metadanych + badge UI
+│   ├── popup.html      # Konfiguracja (popup)
+│   ├── popup.js        # Obsługa popupu (i18n, zapis, test)
+│   ├── options.html    # Pełne ustawienia
+│   ├── options.js      # Logika ustawień
+│   ├── config.json     # Domyślna konfiguracja (bez sekretów)
+│   ├── icon16.png      # Ikona 16×16
+│   ├── icon48.png      # Ikona 48×48
+│   ├── icon96.png      # Ikona 96×96
+│   ├── icon128.png     # Ikona 128×128
+│   └── screenshots/    # Podglądy
+├── chrome/
+│   └── manifest.json   # Manifest Chrome (MV3, service_worker)
+├── firefox/
+│   └── manifest.json   # Manifest Firefox (MV3, scripts, options_ui)
+├── build.sh            # Skrypt budowania — bash build.sh <chrome|firefox>
+├── .gitignore
+├── LICENSE
 └── README.md           # Ta instrukcja
 ```
 

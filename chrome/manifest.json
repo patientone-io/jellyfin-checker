@@ -31,26 +31,26 @@
   "options_page": "options.html",
   "content_scripts": [
     {
-    "matches": [
-      "https://www.imdb.com/title/*",
-      "https://www.imdb.com/name/*",
-      "https://imdb.com/title/*",
-      "https://imdb.com/name/*",
-      "https://m.imdb.com/title/*",
-      "https://m.imdb.com/name/*",
-      "https://www.filmweb.pl/film/*",
-      "https://www.filmweb.pl/serial/*",
-      "https://www.filmweb.pl/person/*",
-      "https://filmweb.pl/film/*",
-      "https://filmweb.pl/serial/*",
-      "https://filmweb.pl/person/*",
-      "https://www.themoviedb.org/movie/*",
-      "https://www.themoviedb.org/tv/*",
-      "https://www.themoviedb.org/person/*",
-      "https://themoviedb.org/movie/*",
-      "https://themoviedb.org/tv/*",
-      "https://themoviedb.org/person/*"
-    ],
+      "matches": [
+        "https://www.imdb.com/title/*",
+        "https://www.imdb.com/name/*",
+        "https://imdb.com/title/*",
+        "https://imdb.com/name/*",
+        "https://m.imdb.com/title/*",
+        "https://m.imdb.com/name/*",
+        "https://www.filmweb.pl/film/*",
+        "https://www.filmweb.pl/serial/*",
+        "https://www.filmweb.pl/person/*",
+        "https://filmweb.pl/film/*",
+        "https://filmweb.pl/serial/*",
+        "https://filmweb.pl/person/*",
+        "https://www.themoviedb.org/movie/*",
+        "https://www.themoviedb.org/tv/*",
+        "https://www.themoviedb.org/person/*",
+        "https://themoviedb.org/movie/*",
+        "https://themoviedb.org/tv/*",
+        "https://themoviedb.org/person/*"
+      ],
       "js": [
         "content.js"
       ],
