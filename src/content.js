@@ -208,23 +208,46 @@ function detectSite() {
 
 /* ─── Metadata extraction ─── */
 function extractIMDB(imdbId) {
-  const t = document.querySelector("h1[data-testid='hero__pageTitle']");
-  const y = document.querySelector("[data-testid='release_year'] a");
+  let title = null;
+  let year = null;
   let type = "movie";
+
+  // Primary: ld+json (most reliable, loads early)
   const ld = document.querySelector('script[type="application/ld+json"]');
   if (ld) {
     try {
       const data = JSON.parse(ld.textContent);
-      const t = data['@type'];
-      if (t && (t === 'TVSeries' || t === 'TVEpisode' || t === 'TVSeason')) type = "tv";
+      if (data.name) title = data.name.trim();
+      const t = data['@type'] || '';
+      if (t === 'TVSeries' || t === 'TVEpisode' || t === 'TVSeason') type = "tv";
+      if (data.datePublished) year = parseInt(data.datePublished.split('-')[0]);
+      if (data.startDate) year = parseInt(data.startDate.split('-')[0]);
     } catch (e) {}
   }
-  return {
-    imdbId,
-    title: t ? t.textContent.trim() : null,
-    year: y ? parseInt(y.textContent.trim()) : null,
-    type
-  };
+
+  // Fallback 1: DOM selector with data-testid
+  if (!title) {
+    const h1 = document.querySelector("h1[data-testid='hero__pageTitle']");
+    if (h1) title = h1.textContent.trim();
+  }
+
+  // Fallback 2: og:title meta
+  if (!title || !year) {
+    const og = document.querySelector('meta[property="og:title"]');
+    if (og) {
+      const m = og.content.match(/^([^-]+?)(?:\s*\(TV Series\s*)?(\d{4})/);
+      if (m && !title) title = m[1].trim();
+      if (m && !year) year = parseInt(m[2]);
+    }
+  }
+
+  // Fallback 3: any h1
+  if (!title) {
+    const h1 = document.querySelector("h1");
+    if (h1) title = h1.textContent.trim();
+  }
+
+  return { imdbId, title, year, type };
 }
 
 function stripRomanSuffix(name) {
