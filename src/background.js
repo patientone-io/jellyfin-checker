@@ -160,11 +160,15 @@ async function handleSearch(params) {
 }
 
 async function searchByProviderId(base, headers, provider, value) {
+  // Jellyfin/Emby doesn't support anyProviderIdEquals on Items endpoint.
+  // Instead: search all items with the provider ID in the filter via Search endpoint,
+  // or just return null and let searchByTitle do the work.
   try {
-    const resp = await fetch(`${base}/Items?IncludeItemTypes=Movie,Series&Recursive=true&anyProviderIdEquals=${provider}%3D${value}&Limit=1`, { headers, signal: AbortSignal.timeout(5000) });
-    if (!resp.ok) return null;
-    const data = await resp.json();
-    return (data.Items && data.Items.length > 0) ? data.Items[0] : null;
+    const providerKey = provider === 'imdb' ? 'IMDb' : 'Tmdb';
+    // Try the Items endpoint with ProviderIds filter — Jellyfin doesn't support
+    // providerIdEquals, so we use a title-based search fallback instead.
+    // This function returns null so handleSearch falls through to searchByTitle.
+    return null;
   } catch { return null; }
 }
 
