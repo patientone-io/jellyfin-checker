@@ -231,13 +231,14 @@ function extractIMDB(imdbId) {
     if (h1) title = h1.textContent.trim();
   }
 
-  // Fallback 2: og:title meta
+  // Fallback 2: og:title meta (e.g. "Family Guy (TV Series 1999– ) ⭐ 8.1")
   if (!title || !year) {
     const og = document.querySelector('meta[property="og:title"]');
     if (og) {
-      const m = og.content.match(/^([^-]+?)(?:\s*\(TV Series\s*)?(\d{4})/);
-      if (m && !title) title = m[1].trim();
-      if (m && !year) year = parseInt(m[2]);
+      // Format: "Title (Type YYYY– )" or "Title (YYYY)" or just "Title"
+      const m = og.content.match(/^([^(]+?)(?:\s*\([^)]*?(\d{4})[^)]*\))?/);
+      if (m && !title) title = m[1].trim().replace(/\s*(?:—|–|⋆|⭐|★).*/, '').trim();
+      if (m && m[2] && !year) year = parseInt(m[2]);
     }
   }
 
