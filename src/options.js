@@ -14,7 +14,9 @@ const TRANSLATIONS = {
     hintApi: "Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada",
     hintKey: "Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz",
     hintBot: "Stwórz bota przez @BotFather → /newbot",
-    hintChat: "ID Twojego czatu lub grupy (np. <code>-1001234567890</code> dla grupy)",
+    hintChatBefore: "ID Twojego czatu lub grupy (np. ",
+    hintChatCode: "-1001234567890",
+    hintChatAfter: " dla grupy)",
     saveBtn: "Zapisz",
     saveTgBtn: "Zapisz",
     testBtn: "Test",
@@ -45,7 +47,9 @@ const TRANSLATIONS = {
     hintApi: "Second URL is optional — used when the first is unreachable",
     hintKey: "Jellyfin → Dashboard → Settings → API Keys → Add API Key",
     hintBot: "Create a bot via @BotFather → /newbot",
-    hintChat: "Your chat or group ID (e.g. <code>-1001234567890</code> for groups)",
+    hintChatBefore: "Your chat or group ID (e.g. ",
+    hintChatCode: "-1001234567890",
+    hintChatAfter: " for groups)",
     saveBtn: "Save",
     saveTgBtn: "Save",
     testBtn: "Test",
@@ -81,8 +85,10 @@ function setLanguage(lang) {
   document.querySelector("[data-i18n='labelChatId']").textContent = t.labelChatId;
   document.getElementById("hint-api").textContent = t.hintApi;
   document.getElementById("hint-key").textContent = t.hintKey;
-  document.getElementById("hint-bot").innerHTML = t.hintBot;
-  document.getElementById("hint-chat").innerHTML = t.hintChat;
+  document.getElementById("hint-bot").textContent = t.hintBot;
+  document.getElementById("hint-chat-before").textContent = t.hintChatBefore;
+  document.getElementById("hint-chat-code").textContent = t.hintChatCode;
+  document.getElementById("hint-chat-after").textContent = t.hintChatAfter;
   document.getElementById("save-btn").textContent = t.saveBtn;
   document.getElementById("save-tg-btn").textContent = t.saveTgBtn;
   document.getElementById("test-btn").textContent = t.testBtn;
