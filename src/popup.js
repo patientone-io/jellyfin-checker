@@ -14,7 +14,8 @@ const TRANSLATIONS = {
     saved: "Zapisano!",
     connected: server => `✅ Połączono z ${server.name} (v${server.version})`,
     connectFail: err => `❌ Błąd połączenia: ${err}`,
-    howToKey: "<strong>Jak uzyskać klucz API:</strong><br>Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz",
+    howToKeyLabel: "Jak uzyskać klucz API:",
+    howToKeyText: "Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz",
     urlLabelExt: "Jellyfin URL #2",
     hintApi: "Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada",
     settingsLink: "Pełne ustawienia",
@@ -32,7 +33,8 @@ const TRANSLATIONS = {
     saved: "Config saved!",
     connected: server => `✅ Connected to ${server.name} (v${server.version})`,
     connectFail: err => `❌ Connection failed: ${err}`,
-    howToKey: "<strong>How to get API key:</strong><br>Jellyfin Dashboard → Settings → API Keys → Add API Key",
+    howToKeyLabel: "How to get API key:",
+    howToKeyText: "Jellyfin Dashboard → Settings → API Keys → Add API Key",
     urlLabelExt: "Jellyfin URL #2",
     hintApi: "Second URL is optional — used when the first is unreachable",
     settingsLink: "Full settings",
@@ -51,7 +53,8 @@ function setLanguage(lang) {
   document.getElementById("jellyfin-api-key").placeholder = t.keyPlaceholder;
   document.getElementById("save-btn").textContent = t.saveBtn;
   document.getElementById("test-btn").textContent = t.testBtn;
-  document.getElementById("config-info").innerHTML = t.howToKey;
+  document.getElementById("config-info-label").textContent = t.howToKeyLabel;
+  document.getElementById("config-info-text").textContent = t.howToKeyText;
   const extLabel = document.querySelector("[data-i18n='urlLabelExt']");
   if (extLabel) extLabel.textContent = t.urlLabelExt;
   const hintApi = document.getElementById("hint-api");

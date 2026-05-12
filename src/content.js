@@ -99,7 +99,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
 
   // Close button
   const closeBtn = document.createElement("button");
-  closeBtn.innerHTML = "&times;";
+  closeBtn.textContent = "\u00D7";
   closeBtn.title = (i18n[lang] || i18n.pl).closeTitle;
   closeBtn.style.cssText = "background:rgba(0,0,0,.15);color:rgba(255,255,255,.7);border:none;font-size:20px;padding:0 10px;cursor:pointer;line-height:1;flex-shrink:0;position:relative;z-index:1;";
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); container.remove(); });
@@ -127,7 +127,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
       e.stopPropagation();
       reqBtn.style.pointerEvents = "none";
       reqBtn.style.opacity = "0.6";
-      reqBtn.innerHTML = t.reqSending;
+      reqBtn.textContent = t.reqSending;
       chrome.runtime.sendMessage({
         action: "request_add",
         meta: metadata,
@@ -137,7 +137,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
           reqBtn.style.background = "#064e3b";
           reqBtn.style.borderColor = "#15803d";
           reqBtn.style.color = "#6ee7b7";
-          reqBtn.innerHTML = t.reqSent;
+          reqBtn.textContent = t.reqSent;
           reqBtn.style.cursor = "default";
           setTimeout(() => reqBtn.remove(), 5000);
         } else {
@@ -145,7 +145,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
           reqBtn.style.background = "#7f1d1d";
           reqBtn.style.borderColor = "#991b1b";
           reqBtn.style.color = "#fca5a5";
-          reqBtn.innerHTML = t.reqFail(msg);
+          reqBtn.textContent = t.reqFail(msg);
           reqBtn.style.cursor = "default";
         }
         reqBtn.style.pointerEvents = "auto";

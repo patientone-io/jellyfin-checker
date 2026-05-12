@@ -6,7 +6,9 @@
   "description": "Check if movies, shows, or people are available on your Jellyfin server",
   "permissions": [
     "storage",
-    "activeTab",
+    "activeTab"
+  ],
+  "host_permissions": [
     "http://*/*",
     "https://*/*"
   ],
@@ -29,6 +31,14 @@
   "options_ui": {
     "page": "options.html",
     "open_in_tab": true
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "jellyfin-checker@patientone",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   },
   "content_scripts": [
     {
