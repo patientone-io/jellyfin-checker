@@ -25,6 +25,8 @@ const TRANSLATIONS = {
     toggleSoundSub: "Piszcz przy znalezieniu filmu",
     toggleRequest: 'Przycisk "Poproś o dodanie"',
     toggleRequestSub: 'Pokazuj gdy film nie jest na Jellyfin',
+    themeLabel: "Motyw interfejsu",
+    themeSub: "Wybierz motyw wyświetlania rozszerzenia",
     saved: "✅ Zapisano konfigurację!",
     savedTg: "✅ Zapisano Telegram!",
     fillFields: "Podaj URL i klucz API",
@@ -58,6 +60,8 @@ const TRANSLATIONS = {
     toggleSoundSub: "Beep when film is found",
     toggleRequest: '"Request film" button',
     toggleRequestSub: 'Show when film is not on Jellyfin',
+    themeLabel: "Interface theme",
+    themeSub: "Choose extension display theme",
     saved: "✅ Configuration saved!",
     savedTg: "✅ Telegram saved!",
     fillFields: "Fill in URL and API key",
@@ -70,6 +74,33 @@ const TRANSLATIONS = {
 };
 
 let currentLang = "pl";
+let currentTheme = "system";
+
+function applyTheme(theme) {
+  currentTheme = theme || "system";
+  if (currentTheme === "dark") {
+    document.documentElement.setAttribute("data-theme", "dark");
+  } else if (currentTheme === "light") {
+    document.documentElement.setAttribute("data-theme", "light");
+  } else {
+    document.documentElement.removeAttribute("data-theme");
+  }
+
+  const btnSys = document.getElementById("theme-system");
+  const btnDark = document.getElementById("theme-dark");
+  const btnLight = document.getElementById("theme-light");
+  if (btnSys) btnSys.classList.toggle("active", currentTheme === "system");
+  if (btnDark) btnDark.classList.toggle("active", currentTheme === "dark");
+  if (btnLight) btnLight.classList.toggle("active", currentTheme === "light");
+}
+
+function saveTheme(theme) {
+  applyTheme(theme);
+  chrome.storage.local.get("config", (result) => {
+    const config = result.config || {};
+    chrome.storage.local.set({ config: { ...config, theme } });
+  });
+}
 
 function setLanguage(lang) {
   currentLang = lang;
@@ -97,6 +128,10 @@ function setLanguage(lang) {
   document.getElementById("toggle-notif-sub").textContent = t.toggleSoundSub;
   document.getElementById("toggle-request-label").textContent = t.toggleRequest;
   document.getElementById("toggle-request-sub").textContent = t.toggleRequestSub;
+  const themeLabelEl = document.getElementById("theme-label");
+  if (themeLabelEl) themeLabelEl.textContent = t.themeLabel;
+  const themeSubEl = document.getElementById("theme-sub");
+  if (themeSubEl) themeSubEl.textContent = t.themeSub;
   // Highlight active lang button
   document.getElementById("lang-pl").classList.toggle("active", lang === "pl");
   document.getElementById("lang-en").classList.toggle("active", lang === "en");
@@ -149,6 +184,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   currentLang = config.language || "en";
   setLanguage(currentLang);
+  applyTheme(config.theme || "system");
 
   // Load toggle states
   const toggleSound = document.getElementById("toggle-sound");
@@ -173,8 +209,36 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Language buttons
-  document.getElementById("lang-pl").addEventListener("click", () => setLanguage("pl"));
-  document.getElementById("lang-en").addEventListener("click", () => setLanguage("en"));
+  document.getElementById("lang-pl")?.addEventListener("click", () => setLanguage("pl"));
+  document.getElementById("lang-en")?.addEventListener("click", () => setLanguage("en"));
+
+  // Theme buttons
+  document.getElementById("theme-system")?.addEventListener("click", () => saveTheme("system"));
+  document.getElementById("theme-dark")?.addEventListener("click", () => saveTheme("dark"));
+  document.getElementById("theme-light")?.addEventListener("click", () => saveTheme("light"));
+
+  // Auto-save on typing in options as well
+  function autoSaveOptions() {
+    const u1 = urlInput.value.trim();
+    const u2 = urlExtInput ? urlExtInput.value.trim() : '';
+    const key = apiKeyInput.value.trim();
+    const bot = telegramTokenInput.value.trim();
+    const chat = telegramChatIdInput.value.trim();
+    chrome.storage.local.get("config", (result) => {
+      const cfg = result.config || {};
+      cfg.jellyfin_urls = [u1, u2].filter(Boolean);
+      cfg.jellyfin_api_key = key;
+      cfg.telegram_bot_token = bot;
+      cfg.telegram_chat_id = chat;
+      chrome.storage.local.set({ config: cfg });
+    });
+  }
+
+  urlInput.addEventListener("input", autoSaveOptions);
+  if (urlExtInput) urlExtInput.addEventListener("input", autoSaveOptions);
+  apiKeyInput.addEventListener("input", autoSaveOptions);
+  telegramTokenInput.addEventListener("input", autoSaveOptions);
+  telegramChatIdInput.addEventListener("input", autoSaveOptions);
 
   // Save
   saveBtn.addEventListener("click", async () => {

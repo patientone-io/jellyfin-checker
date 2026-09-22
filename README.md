@@ -4,7 +4,7 @@
 > *EN:* I built this because I missed this feature. Use at your own risk. Ideas and feedback welcome!  
 > *PL:* Brakowało mi tej funkcjonalności. Używaj na własną rękę. Pomysły i sugestie mile widziane!
 
-[🇵🇱 Polski](#-polski)
+[ 🇬🇧 English ](#-english) • [ 🇵🇱 Polski ](#-polski)
 
 ---
 
@@ -12,7 +12,7 @@
 
 A browser extension that checks in real-time if movies, shows, or people are available on your Jellyfin server while browsing **IMDb**, **Filmweb**, or **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-0.7.1-blue)
+![version](https://img.shields.io/badge/version-1.0.0-blue)
 
 ### Features
 
@@ -20,9 +20,11 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 - **Multiple sources** — works on IMDb, Filmweb, and TMDb
 - **Smart search** — cascading strategy: provider ID → exact title → fuzzy match (Levenshtein)
 - **Multiple URLs** — supports local + remote Jellyfin endpoints
+- **All-in-one popup** — configure server, toggle sound effects, and send Telegram requests directly from the popup
+- **Theme switcher** — System / Dark / Light themes
 - **Telegram** — optional "Request film" button sends a notification via Telegram
 - **Bilingual** — Polish and English UI
-- **Dark theme** — matches modern browser UI
+- **Tampermonkey userscripts** — includes standalone userscripts for lightweight setups
 
 ### How it works
 
@@ -171,9 +173,11 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 - **Wiele źródeł** — działa na IMDb, Filmweb i TMDb
 - **Inteligentne wyszukiwanie** — strategia kaskadowa: ID providera → dokładny tytuł → fuzzy match (Levenshtein)
 - **Wiele serwerów** — obsługuje kilka adresów Jellyfin (lokalny + zdalny), próbuje każdy po kolei
+- **Wszystko w popupie** — pełna konfiguracja serwera, dźwięków i Telegrama dostępna od razu po kliknięciu ikony
+- **Wybór motywu** — motyw Systemowy, Ciemny i Jasny
 - **Telegram** — opcjonalny przycisk "Poproś o film" wysyła powiadomienie przez Telegrama
 - **Dwujęzyczne** — PL i EN
-- **Dark theme** — dopasowane do nowoczesnych przeglądarek
+- **Skrypty Tampermonkey** — w folderze `userscripts/` dla osób preferujących skrypty użytkownika
 
 ### Jak to działa?
 
@@ -276,6 +280,7 @@ jellyfin-checker/
 │   └── manifest.json   # Manifest Chrome (MV3, service_worker)
 ├── firefox/
 │   └── manifest.json   # Manifest Firefox (MV3, scripts, options_ui)
+├── userscripts/        # Samodzielne skrypty Tampermonkey (Jellyfin Checker & Jellyfin to Filmweb)
 ├── build.sh            # Skrypt budowania — bash build.sh <chrome|firefox>
 ├── .gitignore
 ├── LICENSE
@@ -300,12 +305,15 @@ Twój serwer Jellyfin może działać pod dowolnym adresem — localhost, lokaln
 
 Pomysły, zgłoszenia błędów i PR-y mile widziane! Znalazłeś błąd? Podaj kroki do reprodukcji, wersję przeglądarki i Jellyfina. Masz pomysł na funkcję? Opisz co i dlaczego.
 
-### Licencja
+## 👤 Author & Contact / Autor i kontakt
 
-MIT — używaj na własną odpowiedzialność.
+- **Twórca / Author:** `patientone`
+- **E-mail:** [contact@patientone.uk](mailto:contact@patientone.uk)
+- **GitHub:** [@patientone-io](https://github.com/patientone-io)
+- **Strona domowa:** [patientone.uk](https://patientone.uk)
+
+## 📄 License / Licencja
+
+Projekt udostępniany na licencji MIT. Szczegóły w pliku [LICENSE](LICENSE).
 
 Copyright © 2026 patientone
-
----
-
-<p align="center">Built with ❤️ for the Jellyfin community</p>

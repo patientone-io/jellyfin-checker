@@ -5,3 +5,5 @@ config.local.json
 .env
 secrets/
 dist/
+cws-assets/
+webstore.md

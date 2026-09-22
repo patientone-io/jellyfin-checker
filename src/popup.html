@@ -9,83 +9,217 @@
       box-sizing: border-box;
     }
     
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
-      width: 320px;
+    :root, [data-theme="dark"] {
+      --bg-page: #0f172a;
+      --bg-header: #1e293b;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border-color: #334155;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --hint-color: #64748b;
+      --btn-save: #0082C8;
+      --btn-test: #A30C6B;
+      --shadow: 0 4px 16px rgba(0,0,0,0.3);
+      color-scheme: dark;
+    }
+
+    [data-theme="light"] {
+      --bg-page: #f8fafc;
+      --bg-header: #ffffff;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --hint-color: #94a3b8;
+      --btn-save: #0284c7;
+      --btn-test: #9333ea;
+      --shadow: 0 4px 16px rgba(0,0,0,0.08);
+      color-scheme: light;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) {
+        --bg-page: #f8fafc;
+        --bg-header: #ffffff;
+        --bg-card: #ffffff;
+        --bg-input: #ffffff;
+        --border-color: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --hint-color: #94a3b8;
+        --btn-save: #0284c7;
+        --btn-test: #9333ea;
+        --shadow: 0 4px 16px rgba(0,0,0,0.08);
+        color-scheme: light;
+      }
+    }
+
+    html, body {
+      background: var(--bg-page);
+      color: var(--text-main);
+      width: 360px;
+      margin: 0;
+      padding: 0;
       min-height: auto;
+      border: none;
+      outline: none;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      transition: background-color 0.2s, color 0.2s;
     }
     
     .header {
-      background: #1e293b;
-      padding: 16px;
-      border-bottom: 1px solid #334155;
+      background: var(--bg-header);
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       gap: 10px;
     }
     
     .logo {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
     }
     
     .header-text {
-      font-size: 16px;
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .top-controls {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .theme-toggle-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 13px;
+      padding: 3px 6px;
+      border-radius: 6px;
+      transition: all .2s;
+    }
+
+    .theme-toggle-btn:hover {
+      color: var(--text-main);
+      border-color: var(--btn-save);
+    }
+
+    .lang-btn {
+      background: none;
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 11px;
       font-weight: 600;
+      padding: 3px 6px;
+      border-radius: 6px;
+      transition: all .2s;
+    }
+
+    .lang-btn.active {
+      color: var(--btn-save);
+      border-color: var(--btn-save);
+      background: rgba(0, 130, 200, 0.12);
+    }
+
+    /* Tabs Navigation */
+    .tabs {
+      display: flex;
+      background: var(--bg-header);
+      border-bottom: 1px solid var(--border-color);
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 9px 8px;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all .15s;
+    }
+
+    .tab-btn:hover {
+      color: var(--text-main);
+    }
+
+    .tab-btn.active {
+      color: var(--btn-save);
+      border-bottom-color: var(--btn-save);
+      background: rgba(0, 130, 200, 0.08);
     }
     
-    .content {
-      padding: 16px;
-      display: flex;
+    .tab-content {
+      padding: 14px 16px;
+      display: none;
       flex-direction: column;
-      gap: 12px;
+      gap: 11px;
+    }
+
+    .tab-content.active {
+      display: flex;
     }
     
     .field {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 3px;
     }
     
     .label {
       font-size: 11px;
-      font-weight: 500;
-      color: #94a3b8;
+      font-weight: 600;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
     }
     
     .input {
-      background: #1e293b;
-      border: 1px solid #334155;
-      color: #e2e8f0;
-      padding: 8px 12px;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
+      padding: 8px 10px;
       border-radius: 6px;
-      font-size: 14px;
+      font-size: 13px;
       font-family: 'SF Mono', 'Fira Code', monospace;
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
     
     .input:focus {
       outline: none;
-      border-color: #0082C8;
-      box-shadow: 0 0 0 2px rgba(0, 130, 200, 0.3);
+      border-color: var(--btn-save);
+      box-shadow: 0 0 0 2px rgba(0, 130, 200, 0.2);
     }
     
     .button {
       flex: 1;
       font-weight: 600;
       border: none;
-      padding: 10px 16px;
+      padding: 8px 12px;
       border-radius: 6px;
       cursor: pointer;
-      font-size: 14px;
+      font-size: 12px;
       transition: filter 0.2s;
     }
     
     .button:hover {
-      filter: brightness(1.15);
+      filter: brightness(1.12);
     }
     
     .button:disabled {
@@ -96,13 +230,15 @@
     .button-group {
       display: flex;
       gap: 8px;
+      margin-top: 2px;
     }
     
     .status {
       font-size: 12px;
-      padding: 8px 12px;
+      padding: 8px 10px;
       border-radius: 6px;
       display: none;
+      line-height: 1.4;
     }
     
     .status.success {
@@ -122,31 +258,120 @@
       color: #93c5fd;
       display: block;
     }
+
+    .hint {
+      font-size: 11px;
+      color: var(--hint-color);
+      margin-top: 2px;
+      line-height: 1.35;
+    }
+
+    /* Toggles / Switches */
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 0;
+    }
+    .toggle-info {
+      flex: 1;
+      padding-right: 12px;
+    }
+    .toggle-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+    .toggle-sub {
+      font-size: 11px;
+      color: var(--hint-color);
+      line-height: 1.3;
+    }
+
+    .switch {
+      position: relative;
+      width: 40px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: var(--border-color);
+      border-radius: 22px;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    .slider:before {
+      content: "";
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      left: 3px;
+      bottom: 3px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform .2s;
+    }
+    .switch input:checked + .slider { background: #15803d; }
+    .switch input:checked + .slider:before { transform: translateX(18px); }
+
+    .divider {
+      height: 1px;
+      background: var(--border-color);
+      margin: 4px 0;
+    }
     
     .footer {
-      padding: 12px 16px;
-      border-top: 1px solid #334155;
+      padding: 8px 14px;
+      border-top: 1px solid var(--border-color);
       font-size: 11px;
-      color: #64748b;
-      text-align: center;
+      color: var(--hint-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .footer a {
+      color: var(--btn-save);
+      text-decoration: none;
+      font-weight: 500;
+    }
+    .footer a:hover {
+      text-decoration: underline;
     }
   </style>
 </head>
 <body>
-    <div class="header">
-      <img class="logo" src="icon96.png" alt="Jellyfin">
-      <div class="header-text">Jellyfin Checker</div>
-      <div style="margin-left:auto;display:flex;gap:2px;">
-        <button id="lang-pl" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;font-weight:600;padding:4px 6px;border-radius:4px;" title="Polski">PL</button>
-        <button id="lang-en" style="background:none;border:none;color:#94a3b8;cursor:pointer;font-size:11px;font-weight:600;padding:4px 6px;border-radius:4px;" title="English">EN</button>
+  <div class="header">
+    <img class="logo" src="icon48.png" alt="Logo">
+    <div class="header-text">Jellyfin Checker</div>
+    <div class="top-controls">
+      <button class="theme-toggle-btn" id="theme-btn" title="Motyw: System / Ciemny / Jasny">🌓</button>
+      <div style="display:flex;gap:3px;">
+        <button class="lang-btn active" id="lang-pl" title="Polski">PL</button>
+        <button class="lang-btn" id="lang-en" title="English">EN</button>
       </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab-btn-server" data-tab="tab-server">
+      <span>🎬</span> <span data-i18n="tabServer">Serwer</span>
+    </button>
+    <button class="tab-btn" id="tab-btn-settings" data-tab="tab-settings">
+      <span>⚙️</span> <span data-i18n="tabSettings">Opcje & Telegram</span>
+    </button>
   </div>
   
-  <div class="content">
+  <!-- TAB 1: SERVER CONFIG -->
+  <div class="tab-content active" id="tab-server">
     <div class="field">
       <label class="label" data-i18n="urlLabel">Jellyfin URL #1</label>
       <input type="text" id="jellyfin-url" class="input" placeholder="http://localhost:8096">
     </div>
+    
     <div class="field">
       <label class="label" data-i18n="urlLabelExt">Jellyfin URL #2</label>
       <input type="text" id="jellyfin-url-external" class="input" placeholder="https://jellyfin.example.com">
@@ -154,29 +379,70 @@
     </div>
     
     <div class="field">
-      <label class="label" data-i18n="keyLabel">API Key</label>
+      <label class="label" data-i18n="keyLabel">Klucz API</label>
       <input type="password" id="jellyfin-api-key" class="input" placeholder="••••••••">
+      <p class="hint" id="hint-key">Jellyfin → Dashboard → Ustawienia → Klucze API</p>
     </div>
     
     <div class="button-group">
-      <button id="save-btn" class="button" style="background:#0082C8;color:#fff">Save</button>
-      <button id="test-btn" class="button" style="background:#A30C6B;color:#fff">Test</button>
+      <button id="save-btn" class="button" style="background:var(--btn-save);color:#fff" data-i18n="saveBtn">Zapisz</button>
+      <button id="test-btn" class="button" style="background:var(--btn-test);color:#fff" data-i18n="testBtn">Test połączenia</button>
     </div>
     
     <div id="status" class="status"></div>
-    
-    <div id="config-info" style="font-size: 11px; color: #64748b; margin-top: 8px;">
-      <strong id="config-info-label">How to get API key:</strong><br>
-      <span id="config-info-text">Jellyfin Dashboard → Settings → API Keys → Add API Key</span>
+  </div>
+
+  <!-- TAB 2: OPTIONS & TELEGRAM -->
+  <div class="tab-content" id="tab-settings">
+    <!-- Toggles -->
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-label" data-i18n="toggleSound">Powiadomienia dźwiękowe</div>
+        <div class="toggle-sub" data-i18n="toggleSoundSub">Piszcz przy znalezieniu pozycji</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle-sound">
+        <span class="slider"></span>
+      </label>
     </div>
 
-    <div style="border-top:1px solid #334155;margin:12px 0 8px;padding-top:12px;text-align:center;">
-      <a href="#" id="open-options" style="color:#0082C8;font-size:12px;text-decoration:none;font-weight:600;" data-i18n="settingsLink">Full settings</a>
+    <div class="toggle-row">
+      <div class="toggle-info">
+        <div class="toggle-label" data-i18n="toggleRequest">Przycisk „Poproś o dodanie”</div>
+        <div class="toggle-sub" data-i18n="toggleRequestSub">Pokazuj gdy film nie jest na Jellyfin</div>
+      </div>
+      <label class="switch">
+        <input type="checkbox" id="toggle-request">
+        <span class="slider"></span>
+      </label>
     </div>
+
+    <div class="divider"></div>
+
+    <!-- Telegram Configuration -->
+    <div class="field">
+      <label class="label" data-i18n="tgTokenLabel">Telegram Bot Token</label>
+      <input type="password" id="telegram-bot-token" class="input" placeholder="123456:ABC-DEF...">
+      <p class="hint" id="hint-bot">Stwórz bota przez @BotFather → /newbot</p>
+    </div>
+
+    <div class="field">
+      <label class="label" data-i18n="tgChatLabel">Telegram Chat ID</label>
+      <input type="text" id="telegram-chat-id" class="input" placeholder="-1001234567890">
+      <p class="hint" id="hint-chat">ID czatu lub grupy (np. -1001234567890)</p>
+    </div>
+
+    <div class="button-group">
+      <button id="save-tg-btn" class="button" style="background:var(--btn-save);color:#fff" data-i18n="saveTgBtn">Zapisz</button>
+      <button id="test-tg-btn" class="button" style="background:var(--btn-test);color:#fff" data-i18n="testTgBtn">Test Telegram</button>
+    </div>
+
+    <div id="status-tg" class="status"></div>
   </div>
   
   <div class="footer">
-    Jellyfin Checker v0.7.1 • Supports IMDb, Filmweb, TMDb
+    <span>v1.0.0</span>
+    <a href="#" id="open-options" data-i18n="fullOptionsLink">Pełne okno opcji ↗</a>
   </div>
   
   <script src="popup.js"></script>
