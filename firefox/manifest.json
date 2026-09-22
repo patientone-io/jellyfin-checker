@@ -1,25 +1,26 @@
 {
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "Jellyfin Checker",
-  "version": "0.7.4",
+  "version": "1.0.0",
   "author": "patientone",
-  "description": "Check if movies, shows, or people are available on your Jellyfin server",
+  "description": "Browser extension that checks if movies, shows, or people are available on your Jellyfin server",
   "permissions": [
     "storage",
-    "activeTab",
-    "notifications",
-    "<all_urls>"
+    "activeTab"
+  ],
+  "host_permissions": [
+    "http://*/*",
+    "https://*/*"
   ],
   "background": {
-    "scripts": ["background.js"],
-    "persistent": false
+    "scripts": ["background.js"]
   },
   "icons": {
     "16": "icon16.png",
     "48": "icon48.png",
     "128": "icon128.png"
   },
-  "browser_action": {
+  "action": {
     "default_popup": "popup.html",
     "default_icon": {
       "16": "icon16.png",
@@ -34,24 +35,13 @@
   "content_scripts": [
     {
       "matches": [
-        "https://www.imdb.com/title/*",
-        "https://www.imdb.com/name/*",
-        "https://imdb.com/title/*",
-        "https://imdb.com/name/*",
-        "https://m.imdb.com/title/*",
-        "https://m.imdb.com/name/*",
-        "https://www.filmweb.pl/film/*",
-        "https://www.filmweb.pl/serial/*",
-        "https://www.filmweb.pl/person/*",
-        "https://filmweb.pl/film/*",
-        "https://filmweb.pl/serial/*",
-        "https://filmweb.pl/person/*",
-        "https://www.themoviedb.org/movie/*",
-        "https://www.themoviedb.org/tv/*",
-        "https://www.themoviedb.org/person/*",
-        "https://themoviedb.org/movie/*",
-        "https://themoviedb.org/tv/*",
-        "https://themoviedb.org/person/*"
+        "https://www.imdb.com/*",
+        "https://imdb.com/*",
+        "https://m.imdb.com/*",
+        "https://www.filmweb.pl/*",
+        "https://filmweb.pl/*",
+        "https://www.themoviedb.org/*",
+        "https://themoviedb.org/*"
       ],
       "js": [
         "content.js"
@@ -62,10 +52,7 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "jellyfin-checker@patientone",
-      "strict_min_version": "140.0",
-      "data_collection_permissions": {
-        "required": ["none"]
-      }
+      "strict_min_version": "109.0"
     }
   }
 }

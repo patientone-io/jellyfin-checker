@@ -5,16 +5,60 @@
   <title>Jellyfin Checker — Ustawienia</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    
+    :root, [data-theme="dark"] {
+      --bg-page: #0f172a;
+      --bg-card: #1e293b;
+      --bg-input: #0f172a;
+      --border-color: #334155;
+      --text-main: #e2e8f0;
+      --text-muted: #94a3b8;
+      --hint-color: #64748b;
+      --btn-primary: #0082C8;
+      --btn-secondary: #A30C6B;
+      color-scheme: dark;
+    }
+
+    [data-theme="light"] {
+      --bg-page: #f8fafc;
+      --bg-card: #ffffff;
+      --bg-input: #ffffff;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --hint-color: #94a3b8;
+      --btn-primary: #0284c7;
+      --btn-secondary: #9333ea;
+      color-scheme: light;
+    }
+
+    @media (prefers-color-scheme: light) {
+      :root:not([data-theme="dark"]):not([data-theme="light"]) {
+        --bg-page: #f8fafc;
+        --bg-card: #ffffff;
+        --bg-input: #ffffff;
+        --border-color: #e2e8f0;
+        --text-main: #0f172a;
+        --text-muted: #64748b;
+        --hint-color: #94a3b8;
+        --btn-primary: #0284c7;
+        --btn-secondary: #9333ea;
+        color-scheme: light;
+      }
+    }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #0f172a;
-      color: #e2e8f0;
+      background: var(--bg-page);
+      color: var(--text-main);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 40px 20px;
+      transition: background-color .2s, color .2s;
     }
+
     h1 {
       font-size: 24px;
       margin-bottom: 8px;
@@ -22,53 +66,65 @@
       align-items: center;
       gap: 10px;
     }
-    .subtitle { color: #64748b; font-size: 14px; margin-bottom: 32px; }
+
+    .subtitle { color: var(--hint-color); font-size: 14px; margin-bottom: 32px; }
+
     .card {
-      background: #1e293b;
-      border: 1px solid #334155;
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
       border-radius: 12px;
       padding: 24px;
       width: 100%;
       max-width: 520px;
       margin-bottom: 20px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      transition: background-color .2s, border-color .2s;
     }
+
     .card h2 {
       font-size: 16px;
       margin-bottom: 16px;
       padding-bottom: 8px;
-      border-bottom: 1px solid #334155;
+      border-bottom: 1px solid var(--border-color);
       display: flex;
       align-items: center;
       gap: 8px;
     }
+
     .field { margin-bottom: 14px; }
+
     .label {
       font-size: 12px;
       font-weight: 600;
-      color: #94a3b8;
+      color: var(--text-muted);
       text-transform: uppercase;
       letter-spacing: 0.05em;
       margin-bottom: 4px;
       display: block;
     }
+
     .input {
       width: 100%;
-      background: #0f172a;
-      border: 1px solid #334155;
-      color: #e2e8f0;
+      background: var(--bg-input);
+      border: 1px solid var(--border-color);
+      color: var(--text-main);
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 14px;
       font-family: 'SF Mono', 'Fira Code', monospace;
       transition: border-color .2s, box-shadow .2s;
     }
+
     .input:focus {
       outline: none;
-      border-color: #0082C8;
+      border-color: var(--btn-primary);
       box-shadow: 0 0 0 3px rgba(0, 130, 200, 0.2);
     }
-    .input::placeholder { color: #475569; }
+
+    .input::placeholder { color: var(--hint-color); }
+
     .button-group { display: flex; gap: 10px; margin-top: 16px; }
+
     .button {
       flex: 1;
       font-weight: 600;
@@ -79,10 +135,12 @@
       font-size: 14px;
       transition: filter .2s;
     }
-    .button:hover { filter: brightness(1.15); }
-    .button-primary { background: #0082C8; color: #fff; }
-    .button-secondary { background: #A30C6B; color: #fff; }
+
+    .button:hover { filter: brightness(1.12); }
+    .button-primary { background: var(--btn-primary); color: #fff; }
+    .button-secondary { background: var(--btn-secondary); color: #fff; }
     .button:disabled { opacity: 0.5; cursor: not-allowed; filter: none; }
+
     .status {
       font-size: 13px;
       padding: 10px 14px;
@@ -93,15 +151,18 @@
     .status.visible { display: block; }
     .status.success { background: #064e3b; color: #6ee7b7; }
     .status.error { background: #7f1d1d; color: #fca5a5; }
-    .hint { font-size: 12px; color: #475569; margin-top: 6px; line-height: 1.5; }
+
+    .hint { font-size: 12px; color: var(--hint-color); margin-top: 6px; line-height: 1.5; }
+
     .toggle-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 8px 0;
+      padding: 10px 0;
     }
-    .toggle-label { font-size: 14px; }
-    .toggle-sub { font-size: 12px; color: #64748b; }
+    .toggle-label { font-size: 14px; font-weight: 500; }
+    .toggle-sub { font-size: 12px; color: var(--hint-color); }
+
     .switch {
       position: relative;
       width: 44px;
@@ -112,7 +173,7 @@
     .slider {
       position: absolute;
       inset: 0;
-      background: #475569;
+      background: var(--border-color);
       border-radius: 24px;
       cursor: pointer;
       transition: background .2s;
@@ -130,17 +191,20 @@
     }
     .switch input:checked + .slider { background: #15803d; }
     .switch input:checked + .slider:before { transform: translateX(20px); }
-    .lang-toggle {
+
+    .top-nav {
       position: fixed;
       top: 20px;
       right: 20px;
       display: flex;
-      gap: 4px;
+      gap: 6px;
+      align-items: center;
     }
-    .lang-btn {
-      background: none;
-      border: 1px solid #334155;
-      color: #94a3b8;
+
+    .lang-btn, .theme-btn {
+      background: var(--bg-card);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
       cursor: pointer;
       font-size: 12px;
       font-weight: 600;
@@ -148,21 +212,22 @@
       border-radius: 6px;
       transition: all .2s;
     }
-    .lang-btn.active {
-      border-color: #0082C8;
-      color: #e2e8f0;
-      background: rgba(0, 130, 200, 0.1);
+
+    .lang-btn.active, .theme-btn.active {
+      border-color: var(--btn-primary);
+      color: var(--text-main);
+      background: rgba(0, 130, 200, 0.15);
     }
   </style>
 </head>
 <body>
 
-  <div class="lang-toggle">
+  <div class="top-nav">
     <button class="lang-btn" id="lang-pl">PL</button>
     <button class="lang-btn" id="lang-en">EN</button>
   </div>
 
-  <h1><img src="icon96.png" width="32" height="32" alt=""> Jellyfin Checker</h1>
+  <h1><img src="icon48.png" width="28" height="28" alt=""> Jellyfin Checker</h1>
   <p class="subtitle" id="subtitle">Konfiguracja rozszerzenia</p>
 
   <div class="card">
@@ -209,6 +274,19 @@
 
   <div class="card">
     <h2 data-i18n="headingSettings">🌍 Ustawienia</h2>
+    
+    <div class="toggle-row" style="border-bottom: 1px solid var(--border-color); margin-bottom: 8px; padding-bottom: 14px;">
+      <div>
+        <div class="toggle-label" id="theme-label">Motyw interfejsu</div>
+        <div class="toggle-sub" id="theme-sub">Wybierz motyw wyświetlania rozszerzenia</div>
+      </div>
+      <div style="display:flex;gap:6px;">
+        <button class="theme-btn" id="theme-system">💻 System</button>
+        <button class="theme-btn" id="theme-dark">🌙 Dark</button>
+        <button class="theme-btn" id="theme-light">☀️ Light</button>
+      </div>
+    </div>
+
     <div class="toggle-row">
       <div>
         <div class="toggle-label" id="toggle-notif-label">Powiadomienia dźwiękowe</div>

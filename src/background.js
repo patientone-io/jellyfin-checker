@@ -101,35 +101,14 @@ async function handleSearch(params) {
   }
 
   const urls = config.jellyfin_urls;
-  const headers = { "X-Emby-Token": config.jellyfin_api_key, "accept": "application/json" };
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.0", Token="${config.jellyfin_api_key}"`;
+  const headers = {
+    "Authorization": authHeader,
+    "X-Emby-Token": config.jellyfin_api_key,
+    "accept": "application/json"
+  };
 
-  // 1 — By IMDb ID
-  if (params.imdbId && params.type !== "person") {
-    const fn = async (base) => searchByProviderId(base, headers, "imdb", params.imdbId);
-    const found = await searchAllUrls(urls, headers, fn);
-    if (found) {
-      const itemName = found.result.Name || "";
-      if (params.title && !titleSimilarMatch(normalizeStr(itemName), normalizeStr(params.title))) {
-        console.warn(`[JK] IMDb match title mismatch: expected "${params.title}", got "${itemName}" — falling through`);
-      } else {
-        return { found: true, item: found.result, jellyfinURL: found.jellyfinURL };
-      }
-    }
-  }
-  // 2 — By TMDb ID
-  if (params.tmdbId) {
-    const fn = async (base) => searchByProviderId(base, headers, "tmdb", params.tmdbId);
-    const found = await searchAllUrls(urls, headers, fn);
-    if (found) {
-      const itemName = found.result.Name || "";
-      if (params.title && !titleSimilarMatch(normalizeStr(itemName), normalizeStr(params.title))) {
-        console.warn(`[JK] TMDb match title mismatch: expected "${params.title}", got "${itemName}" — falling through`);
-      } else {
-        return { found: true, item: found.result, jellyfinURL: found.jellyfinURL };
-      }
-    }
-  }
-  // 3 — Person search
+  // 1 — Person search
   if (params.type === "person" && params.title) {
     const fn = async (base) => searchByPerson(base, headers, params.title);
     for (const raw of urls) {
@@ -143,14 +122,16 @@ async function handleSearch(params) {
     }
     return { found: false };
   }
-  // 4 — Fuzzy by title+year
+
+  // 2 — Search by title & provider ID (checks both Movie and Series)
   if (params.title && params.type !== "person") {
-    let fn = async (base) => searchByTitle(base, headers, params.title, params.year, params.type);
+    let fn = async (base) => searchByTitle(base, headers, params.title, params.year, params.type, params.imdbId, params.tmdbId);
     let found = await searchAllUrls(urls, headers, fn);
     if (found) return { found: true, item: found.result, jellyfinURL: found.jellyfinURL };
-    // Fallback: try original title (e.g. English title from Filmweb)
+
+    // Fallback: try original title (e.g. English original title from Filmweb)
     if (params.originalTitle && params.originalTitle !== params.title) {
-      fn = async (base) => searchByTitle(base, headers, params.originalTitle, params.year, params.type);
+      fn = async (base) => searchByTitle(base, headers, params.originalTitle, params.year, params.type, params.imdbId, params.tmdbId);
       found = await searchAllUrls(urls, headers, fn);
       if (found) return { found: true, item: found.result, jellyfinURL: found.jellyfinURL };
     }
@@ -159,32 +140,34 @@ async function handleSearch(params) {
   return { found: false };
 }
 
-async function searchByProviderId(base, headers, provider, value) {
-  // Jellyfin/Emby doesn't support anyProviderIdEquals on Items endpoint.
-  // Instead: search all items with the provider ID in the filter via Search endpoint,
-  // or just return null and let searchByTitle do the work.
+async function searchByTitle(base, headers, title, year, type, imdbId, tmdbId) {
   try {
-    const providerKey = provider === 'imdb' ? 'IMDb' : 'Tmdb';
-    // Try the Items endpoint with ProviderIds filter — Jellyfin doesn't support
-    // providerIdEquals, so we use a title-based search fallback instead.
-    // This function returns null so handleSearch falls through to searchByTitle.
-    return null;
-  } catch { return null; }
-}
-
-async function searchByTitle(base, headers, title, year, type) {
-  try {
-    const resp = await fetch(`${base}/Items?SearchTerm=${encodeURIComponent(title)}&IncludeItemTypes=${type === "tv" ? "Series" : "Movie"}&Recursive=true&Limit=5`, { headers, signal: AbortSignal.timeout(5000) });
+    const resp = await fetch(`${base}/Items?SearchTerm=${encodeURIComponent(title)}&IncludeItemTypes=Movie,Series&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`, { headers, signal: AbortSignal.timeout(5000) });
     if (!resp.ok) return null;
     const data = await resp.json();
-    if (!data.Items) return null;
+    if (!data.Items || data.Items.length === 0) return null;
+
+    // 1. Exact ProviderId match if available (highest confidence)
+    for (const item of data.Items) {
+      const pIds = item.ProviderIds || {};
+      if (imdbId && pIds.Imdb && pIds.Imdb.toLowerCase() === imdbId.toLowerCase()) {
+        return item;
+      }
+      if (tmdbId && pIds.Tmdb && String(pIds.Tmdb) === String(tmdbId)) {
+        return item;
+      }
+    }
+
+    // 2. Similarity match (normalized title or originalTitle)
     const normalize = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
     const target = normalize(title);
     for (const item of data.Items) {
-      if (!titleSimilarMatch(normalize(item.Name || ""), target)) continue;
+      const normName = normalize(item.Name || "");
+      const normOrig = item.OriginalTitle ? normalize(item.OriginalTitle) : "";
+      if (!titleSimilarMatch(normName, target) && !titleSimilarMatch(normOrig, target)) continue;
       const y = extractYear(item);
       if (year && y && y !== year) {
-        // Allow ±2 year tolerance (TV series often have mismatched premiere dates)
+        // Allow ±2 year tolerance
         const tolerance = Math.abs(y - year) <= 2;
         if (!tolerance) continue;
       }
@@ -196,7 +179,7 @@ async function searchByTitle(base, headers, title, year, type) {
 
 async function searchByPerson(base, headers, name) {
   try {
-    const resp = await fetch(`${base}/Items?IncludeItemTypes=Movie,Series&Recursive=true&Person=${encodeURIComponent(name)}&Limit=20`, { headers, signal: AbortSignal.timeout(5000) });
+    const resp = await fetch(`${base}/Items?IncludeItemTypes=Movie,Series&Recursive=true&Person=${encodeURIComponent(name)}&Limit=30`, { headers, signal: AbortSignal.timeout(5000) });
     if (!resp.ok) return [];
     const data = await resp.json();
     return (data.Items || []).map(i => ({ name: i.Name, year: i.ProductionYear, type: i.Type, id: i.Id }));
@@ -227,10 +210,28 @@ function extractYear(item) {
 
 async function testConnection(url, apiKey) {
   const base = url.replace(/\/$/, "");
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.0", Token="${apiKey}"`;
+  const headers = { "Authorization": authHeader, "X-Emby-Token": apiKey, "accept": "application/json" };
+  
+  // 1. Try authenticated /System/Info first to verify API key
   try {
-    const resp = await fetch(`${base}/System/Info/Public`, { headers: { "X-Emby-Token": apiKey }, signal: AbortSignal.timeout(5000) });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
+    const resp = await fetch(`${base}/System/Info`, { headers, signal: AbortSignal.timeout(5000) });
+    if (resp.status === 401 || resp.status === 403) {
+      return { success: false, error: "Błędny klucz API (HTTP 401/403) — sprawdź uprawnienia klucza w Jellyfinie" };
+    }
+    if (resp.ok) {
+      const data = await resp.json();
+      return { success: true, serverName: data.ServerName || "Jellyfin", version: data.Version };
+    }
+  } catch (e) {
+    // If connection refused or timeout, fallback or propagate
+  }
+
+  // 2. Fallback to /System/Info/Public to test host reachability
+  try {
+    const pubResp = await fetch(`${base}/System/Info/Public`, { headers, signal: AbortSignal.timeout(5000) });
+    if (!pubResp.ok) throw new Error(`HTTP ${pubResp.status}`);
+    const data = await pubResp.json();
     return { success: true, serverName: data.ServerName || "Jellyfin", version: data.Version };
   } catch (e) { return { success: false, error: e.message }; }
 }
