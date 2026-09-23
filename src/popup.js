@@ -67,8 +67,12 @@ const TRANSLATIONS = {
   }
 };
 
-let currentLang = "pl";
+let currentLang = "en";
 let currentTheme = "system";
+
+function detectBrowserLang() {
+  return (navigator.language || "").toLowerCase().startsWith("pl") ? "pl" : "en";
+}
 
 function applyTheme(theme) {
   currentTheme = theme || "system";
@@ -176,7 +180,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (toggleSound) toggleSound.checked = config.enable_sound_notifications ?? false;
     if (toggleRequest) toggleRequest.checked = config.enable_request_button ?? false;
 
-    currentLang = config.language || "pl";
+    currentLang = config.language || detectBrowserLang();
     setLanguage(currentLang);
     applyTheme(config.theme || "system");
   });

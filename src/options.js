@@ -73,8 +73,12 @@ const TRANSLATIONS = {
   }
 };
 
-let currentLang = "pl";
+let currentLang = "en";
 let currentTheme = "system";
+
+function detectBrowserLang() {
+  return (navigator.language || "").toLowerCase().startsWith("pl") ? "pl" : "en";
+}
 
 function applyTheme(theme) {
   currentTheme = theme || "system";
@@ -182,7 +186,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (config.telegram_bot_token) telegramTokenInput.value = config.telegram_bot_token;
   if (config.telegram_chat_id) telegramChatIdInput.value = config.telegram_chat_id;
 
-  currentLang = config.language || "en";
+  currentLang = config.language || detectBrowserLang();
   setLanguage(currentLang);
   applyTheme(config.theme || "system");
 
@@ -247,11 +251,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const url1 = urlInput.value.trim();
     const url2 = urlExtInput?.value.trim() || '';
-    const urls = [url1, url2];
+    const apiKey = apiKeyInput.value.trim();
+    const urls = [url1, url2].filter(Boolean);
 
     const config = {
       jellyfin_urls: urls,
-      jellyfin_api_key: urls.length > 0 ? apiKeyInput.value.trim() : "",
+      jellyfin_api_key: apiKey,
       telegram_bot_token: telegramTokenInput.value.trim(),
       telegram_chat_id: telegramChatIdInput.value.trim(),
       language: currentLang || "en",
@@ -259,7 +264,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       enable_sound_notifications: document.getElementById("toggle-sound")?.checked ?? false
     };
 
-    if (urls.length === 0 || !apiKeyInput.value.trim()) {
+    if (urls.length === 0 || !apiKey) {
       showStatus("status-jf", TRANSLATIONS[currentLang].fillFields, "error");
       return;
     }

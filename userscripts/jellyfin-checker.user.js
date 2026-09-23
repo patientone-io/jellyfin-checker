@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jellyfin Checker
 // @namespace    patientone.io
-// @version      0.9.5
+// @version      1.0.0
 // @description  Checks if movies, shows, or people are available on your Jellyfin server. Works with IMDb, Filmweb, and TMDb.
 // @author       patientone
 // @match        https://www.imdb.com/*
@@ -31,7 +31,7 @@
     jellyfin_api_key: "",
     telegram_bot_token: "",
     telegram_chat_id: "",
-    language: "pl",
+    language: "en",
     enable_request_button: false,
     enable_sound_notifications: false
   };
@@ -173,7 +173,9 @@
   }
 
   function getLang() {
-    return getConfig().language || "en";
+    const stored = GM_getValue("config", {});
+    if (stored.language) return stored.language;
+    return (navigator.language || "").toLowerCase().startsWith("pl") ? "pl" : "en";
   }
 
   async function badgeText(key, ...args) {
@@ -283,7 +285,7 @@
   function getJellyfinHeaders(apiKey) {
     const headers = {};
     if (apiKey) {
-      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="0.9.5", Token="${apiKey}"`;
+      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.0", Token="${apiKey}"`;
       headers["X-Emby-Token"] = apiKey;
     }
     return headers;
@@ -378,7 +380,7 @@
 
     // 4. Try originalTitle text-based search if different
     if (params.originalTitle && params.originalTitle !== params.title) {
-      const queryUrl2 = `${base}/Items?SearchTerm=${encodeURIComponent(params.originalTitle)}&IncludeItemTypes=${itemTypes}&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
+      const queryUrl2 = `${base}/Items?SearchTerm=${encodeURIComponent(params.originalTitle)}&IncludeItemTypes=Movie,Series&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
       const resp2 = await gmFetch(queryUrl2, { headers, timeout: 4000 });
       if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
 
@@ -1295,10 +1297,10 @@
 
   // --- App Bootstrap ---
   async function run(bypassCache = false) {
-    console.log("[JK] Loading Userscript Jellyfin Checker v0.9.5...");
+    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.0...");
 
     // Auto-clear cache on version upgrade
-    const CURRENT_VERSION = "0.9.5";
+    const CURRENT_VERSION = "1.0.0";
     const storedVer = GM_getValue("last_installed_version", "");
     if (storedVer !== CURRENT_VERSION) {
       GM_setValue("search_cache_data", {});

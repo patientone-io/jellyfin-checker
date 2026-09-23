@@ -1,12 +1,11 @@
 {
   "manifest_version": 3,
   "name": "Jellyfin Checker",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "patientone",
   "description": "Browser extension that checks if movies, shows, or people are available on your Jellyfin server",
   "permissions": [
-    "storage",
-    "activeTab"
+    "storage"
   ],
   "host_permissions": [
     "http://*/*",
