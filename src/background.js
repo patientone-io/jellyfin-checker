@@ -1,26 +1,29 @@
 // Jellyfin Checker - Background Service Worker
 
 const DEFAULT_CONFIG = {
-  jellyfin_url: "http://localhost:8096",
-  jellyfin_api_key: ""
+  jellyfin_urls: ["http://localhost:8096"],
+  jellyfin_api_key: "",
+  telegram_bot_token: "",
+  telegram_chat_id: "",
+  language: "en",
+  theme: "system",
+  enable_request_button: false,
+  enable_sound_notifications: false
 };
 
 chrome.runtime.onInstalled.addListener(() => {
-  // Load defaults from config.json
-  fetch(chrome.runtime.getURL("config.json"))
-    .then(r => r.json())
-    .then(cfg => {
-      chrome.storage.local.get("config", (result) => {
-        const existing = result.config || {};
-        // Only set defaults from config.json if not already configured
-        if (!existing.jellyfin_api_key && cfg.jellyfin_api_key) {
-          chrome.storage.local.set({
-            config: { ...cfg, ...existing }
-          });
-        }
-      });
-    })
-    .catch(() => {});
+  chrome.storage.local.get("config", (result) => {
+    const existing = result.config || {};
+    const merged = { ...DEFAULT_CONFIG, ...existing };
+
+    // Migration from older versions (jellyfin_url -> jellyfin_urls)
+    if (existing.jellyfin_url && (!existing.jellyfin_urls || existing.jellyfin_urls.length === 0)) {
+      merged.jellyfin_urls = [existing.jellyfin_url];
+    }
+    delete merged.jellyfin_url;
+
+    chrome.storage.local.set({ config: merged });
+  });
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -101,7 +104,7 @@ async function handleSearch(params) {
   }
 
   const urls = config.jellyfin_urls;
-  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.0", Token="${config.jellyfin_api_key}"`;
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.1", Token="${config.jellyfin_api_key}"`;
   const headers = {
     "Authorization": authHeader,
     "X-Emby-Token": config.jellyfin_api_key,
@@ -210,7 +213,7 @@ function extractYear(item) {
 
 async function testConnection(url, apiKey) {
   const base = url.replace(/\/$/, "");
-  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.0", Token="${apiKey}"`;
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.1", Token="${apiKey}"`;
   const headers = { "Authorization": authHeader, "X-Emby-Token": apiKey, "accept": "application/json" };
   
   // 1. Try authenticated /System/Info first to verify API key

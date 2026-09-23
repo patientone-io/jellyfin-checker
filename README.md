@@ -12,7 +12,7 @@
 
 A browser extension that checks in real-time if movies, shows, or people are available on your Jellyfin server while browsing **IMDb**, **Filmweb**, or **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-1.0.0-blue)
+![version](https://img.shields.io/badge/version-1.0.1-blue)
 
 ### Features
 
@@ -105,6 +105,7 @@ Built for household members — when someone finds a movie that's not on your Je
 | Filmweb | `filmweb.pl/person/*` | Person name (cleaned) |
 | TMDb | `themoviedb.org/movie/*` | Provider ID (tmdb) |
 | TMDb | `themoviedb.org/tv/*` | Provider ID (tmdb) |
+| TMDb | `themoviedb.org/person/*` | Person name |
 
 ### File structure
 
@@ -127,11 +128,20 @@ jellyfin-checker/
 │   └── manifest.json   # Chrome manifest (MV3, service_worker)
 ├── firefox/
 │   └── manifest.json   # Firefox manifest (MV3, scripts, options_ui)
+├── userscripts/        # Standalone Tampermonkey scripts (jellyfin-checker 1.0.0 & jellyfin-to-filmweb 1.3.1)
 ├── build.sh            # Build script — run: bash build.sh <chrome|firefox>
 ├── .gitignore
 ├── LICENSE
 └── README.md           # This file
 ```
+
+### Component versions
+
+| Component | Version | Notes |
+|-----------|---------|-------|
+| Browser extension | 1.0.1 | `chrome/` + `firefox/` manifests, popup footer, `background.js` auth header |
+| `jellyfin-checker.user.js` | 1.0.0 | Standalone userscript, versioned independently |
+| `jellyfin-to-filmweb.user.js` | 1.3.1 | Separate bridge project in the same monorepo, versioned independently |
 
 ### Security & Privacy
 
@@ -145,7 +155,7 @@ You can edit `config.json` before distribution to pre-fill server URL, API key, 
 
 #### Why does the extension need access to all websites?
 
-Your Jellyfin server can run on any address — `localhost`, a local IP (`192.168.x.x`), or a public domain. Since this can't be predicted at build time, the extension requests broad host permissions. The extension **does not** read or modify page content — it only connects to your configured Jellyfin server and optionally Telegram.
+Your Jellyfin server can run on any address — `localhost`, a local IP (`192.168.x.x`), or a public domain. Since this can't be predicted at build time, the extension requests broad host permissions. The extension reads page metadata (title, year, IDs) to match your library and injects a status badge — it does not collect data, and connects only to your configured Jellyfin server and optionally Telegram.
 
 ### Contributing
 
@@ -165,7 +175,7 @@ Copyright © 2026 patientone
 
 Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, serial lub osoba znajduje się na Twoim serwerze Jellyfin — podczas przeglądania **IMDb**, **Filmweb** lub **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-0.7.1-blue)
+![version](https://img.shields.io/badge/version-1.0.1-blue)
 
 ### Funkcje
 
@@ -258,6 +268,7 @@ Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Fi
 | Filmweb | `filmweb.pl/person/*` | Nazwa osoby (oczyszczona) |
 | TMDb | `themoviedb.org/movie/*` | ID providera (tmdb) |
 | TMDb | `themoviedb.org/tv/*` | ID providera (tmdb) |
+| TMDb | `themoviedb.org/person/*` | Nazwa osoby |
 
 ### Struktura plików
 
@@ -287,6 +298,14 @@ jellyfin-checker/
 └── README.md           # Ta instrukcja
 ```
 
+### Wersje komponentów
+
+| Komponent | Wersja | Uwagi |
+|-----------|--------|-------|
+| Rozszerzenie przeglądarki | 1.0.1 | manifesty `chrome/` + `firefox/`, stopka popupu, nagłówek auth w `background.js` |
+| `jellyfin-checker.user.js` | 1.0.0 | Samodzielny userscript, wersjonowany niezależnie |
+| `jellyfin-to-filmweb.user.js` | 1.3.1 | Osobny mostek w tym samym monorepo, wersjonowany niezależnie |
+
 ### Bezpieczeństwo i prywatność
 
 - **Klucze API przechowywane w `chrome.storage.local`** — dane zapisane lokalnie, dostępne tylko dla rozszerzenia
@@ -299,7 +318,7 @@ Możesz edytować `config.json` przed dystrybucją, aby wstępnie wypełnić URL
 
 #### Dlaczego rozszerzenie prosi o dostęp do wszystkich stron?
 
-Twój serwer Jellyfin może działać pod dowolnym adresem — localhost, lokalne IP lub domena publiczna. Nie da się tego przewidzieć na etapie budowania, dlatego rozszerzenie prosi o szerokie uprawnienia. Rozszerzenie **nie czyta i nie modyfikuje** treści stron — łączy się tylko ze skonfigurowanym serwerem Jellyfin i opcjonalnie Telegramem.
+Twój serwer Jellyfin może działać pod dowolnym adresem — localhost, lokalne IP lub domena publiczna. Nie da się tego przewidzieć na etapie budowania, dlatego rozszerzenie prosi o szerokie uprawnienia. Rozszerzenie odczytuje metadane strony (tytuł, rok, ID) w celu dopasowania biblioteki i wstrzykuje badge statusu — nie zbiera danych, łączy się tylko ze skonfigurowanym serwerem Jellyfin i opcjonalnie Telegramem.
 
 ### Współpraca
 

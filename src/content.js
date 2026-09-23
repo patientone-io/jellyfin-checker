@@ -41,17 +41,21 @@ const i18n = {
   }
 };
 
+function detectBrowserLang() {
+  return (navigator.language || "").toLowerCase().startsWith("pl") ? "pl" : "en";
+}
+
 async function getLang() {
   return new Promise((resolve) => {
     chrome.storage.local.get("config", (r) => {
-      resolve((r.config && r.config.language) || "en");
+      resolve((r.config && r.config.language) || detectBrowserLang());
     });
   });
 }
 
 async function badgeText(key, ...args) {
   const lang = await getLang();
-  const t = i18n[lang] || i18n.pl;
+  const t = i18n[lang] || i18n.en;
   const val = t[key];
   return typeof val === "function" ? val(...args) : val;
 }
@@ -100,7 +104,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
   // Close button
   const closeBtn = document.createElement("button");
   closeBtn.textContent = "\u00D7";
-  closeBtn.title = (i18n[lang] || i18n.pl).closeTitle;
+  closeBtn.title = (i18n[lang] || i18n.en).closeTitle;
   closeBtn.style.cssText = "background:rgba(0,0,0,.15);color:rgba(255,255,255,.7);border:none;font-size:20px;padding:0 10px;cursor:pointer;line-height:1;flex-shrink:0;position:relative;z-index:1;";
   closeBtn.addEventListener("click", (e) => { e.stopPropagation(); container.remove(); });
   closeBtn.addEventListener("mouseenter", () => { closeBtn.style.color = "#fff"; });
@@ -119,7 +123,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
 
   // ─── Request button (when film not on Jellyfin)
   if (requestable && metadata?.title) {
-    const t = i18n[lang] || i18n.pl;
+    const t = i18n[lang] || i18n.en;
     const reqBtn = document.createElement("button");
     reqBtn.textContent = t.reqBtn;
     reqBtn.style.cssText = "background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s;font-family:inherit;";
