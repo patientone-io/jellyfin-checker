@@ -5,3 +5,8 @@ config.local.json
 .env
 secrets/
 dist/
+# Notatki robocze i materiały sklepowe nigdy do publicznego repo (AGENTS.md §5):
+ROADMAP.md
+CHROMEWEBSTORE.md
+webstore.md
+cws-assets/
