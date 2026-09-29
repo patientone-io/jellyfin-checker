@@ -13,6 +13,7 @@
 A browser extension that checks in real-time if movies, shows, or people are available on your Jellyfin server while browsing **IMDb**, **Filmweb**, or **The Movie Database (TMDb)**.
 
 ![version](https://img.shields.io/badge/version-1.0.1-blue)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Features
 
@@ -59,6 +60,12 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 5. **Original title fallback** — for Filmweb, tries the English original title
 
 ### Installation
+
+#### Chrome / Brave / Edge (Recommended)
+
+Install directly from the **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
+
+#### Manual installation (Firefox / Development)
 
 1. Clone this repository: `git clone https://github.com/patientone-io/jellyfin-checker.git`
 2. Build for your browser:
@@ -176,6 +183,7 @@ Copyright © 2026 patientone
 Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, serial lub osoba znajduje się na Twoim serwerze Jellyfin — podczas przeglądania **IMDb**, **Filmweb** lub **The Movie Database (TMDb)**.
 
 ![version](https://img.shields.io/badge/version-1.0.1-blue)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Funkcje
 
@@ -222,6 +230,12 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 5. **Oryginalny tytuł** — dla Filmwebu próbuje też angielski tytuł oryginalny
 
 ### Instalacja
+
+#### Chrome / Brave / Edge (Rekomendowane)
+
+Zainstaluj bezpośrednio z **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
+
+#### Instalacja ręczna (Firefox / Tryb deweloperski)
 
 1. Sklonuj repozytorium: `git clone https://github.com/patientone-io/jellyfin-checker.git`
 2. Zbuduj dla swojej przeglądarki:
