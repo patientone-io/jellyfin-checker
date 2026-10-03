@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jellyfin to Filmweb Linker
 // @namespace    patientone.io
-// @version      1.3.1
+// @version      1.4.0
 // @description  Dodaje przycisk przenieś bezpośrednio do konkretnego filmu/serialu na Filmwebie z poziomu Jellyfina.
 // @author       patientone
 // @match        http://localhost:8096/*
@@ -59,78 +59,202 @@
     });
   }
 
-  // Tworzy bezpieczny slug dla routera Filmwebu (np. "Straszny film" -> "straszny-film")
-  function slugify(text) {
-    if (!text) return 'f';
+  // Normalizacja tytułu do porównań (lowercase, bez diakrytyków i interpunkcji)
+  function normalizeTitle(text) {
+    if (!text) return '';
     return text
       .toLowerCase()
       .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '') // Usuń znaki diakrytyczne
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_-]+/g, '-')
-      .replace(/^-+|-+$/g, '') || 'f';
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  // Warianty tytułu: pełny + okrojony przed ": Shoot", " - ", " (..." (np. "Last Stop Larrimah: Murder Down Under" -> "Last Stop Larrimah")
+  function titleBaseForms(t) {
+    if (!t) return [];
+    const full = t.trim();
+    if (!full) return [];
+    const out = [full];
+    const candidates = [
+      full.split(':')[0],
+      full.split('–')[0].split('—')[0],
+      full.split(' - ')[0],
+      full.split(' (')[0]
+    ];
+    for (const c of candidates) {
+      const v = (c || '').trim();
+      if (v && v.length >= 3 && !out.includes(v)) out.push(v);
+    }
+    return out;
+  }
+
+  // Kolejność zapytań: warianty z rokiem (pełne i okrojone), potem bez roku. Max 8, bez duplikatów.
+  function buildSearchQueries(title, year, originalTitle) {
+    const ordered = [];
+    const seen = new Set();
+    const push = (q) => {
+      if (q && !seen.has(q)) {
+        seen.add(q);
+        ordered.push(q);
+      }
+    };
+    const groups = [...titleBaseForms(title)];
+    for (const b of titleBaseForms(originalTitle)) {
+      if (!groups.includes(b)) groups.push(b);
+    }
+    if (year) {
+      for (const g of groups) push(`${g} ${year}`);
+    }
+    for (const g of groups) push(g);
+    return ordered.slice(0, 8);
+  }
+
+  // Oczekiwany typ na Filmwebie na podstawie typu z Jellyfina. Movie -> film (ściśle), Series/Season/Episode -> serial.
+  function jellyfinTypeToFilmweb(jellyfinType) {
+    if (!jellyfinType) return null;
+    if (jellyfinType === 'Movie') return 'film';
+    if (jellyfinType === 'Series' || jellyfinType === 'Season' || jellyfinType === 'Episode') return 'serial';
+    return null;
+  }
+
+  function tokenOverlap(a, b) {
+    if (!a || !b) return 0;
+    const sa = new Set(a.split(' '));
+    const sb = new Set(b.split(' '));
+    let inter = 0;
+    sa.forEach(t => { if (sb.has(t)) inter++; });
+    return inter / Math.max(sa.size, sb.size);
+  }
+
+  // Punktacja kandydata z API. Niezgodny typ (gdy znany) lub rok różniący się o >1 -> odrzucenie (-1000).
+  function scoreCandidate(candidate, wanted) {
+    const infoNorm = normalizeTitle(candidate.infoTitle || candidate.matchedTitle || '');
+    if (!infoNorm) return -1000;
+    if (wanted.expectedType && candidate.candidateType && candidate.candidateType !== wanted.expectedType) {
+      return -1000;
+    }
+
+    let titleScore = -20;
+    for (const w of wanted.wantedTitlesNorm) {
+      if (!w) continue;
+      if (infoNorm === w) {
+        titleScore = 60;
+        break;
+      }
+      if (infoNorm.startsWith(w) || w.startsWith(infoNorm)) {
+        titleScore = Math.max(titleScore, 30);
+      } else if (infoNorm.includes(w) || w.includes(infoNorm)) {
+        titleScore = Math.max(titleScore, 20);
+      } else {
+        const ov = tokenOverlap(infoNorm, w);
+        if (ov >= 0.66) titleScore = Math.max(titleScore, 20);
+        else if (ov >= 0.4) titleScore = Math.max(titleScore, 10);
+      }
+    }
+
+    let yearScore = 0;
+    if (wanted.wantedYearNum && candidate.infoYear) {
+      const d = Math.abs(Number(candidate.infoYear) - wanted.wantedYearNum);
+      if (d === 0) yearScore = 50;
+      else if (d === 1) yearScore = 25;
+      else return -1000;
+    }
+
+    let typeScore = 0;
+    if (wanted.expectedType && candidate.candidateType === wanted.expectedType) typeScore = 10;
+
+    return titleScore + yearScore + typeScore;
+  }
+
+  // Slug dla routera Filmwebu: zachowaj wielkość liter, spacje jako "+", usuń interpunkcję (np. ":").
+  function buildFilmwebSlug(titleText) {
+    if (!titleText) return '-';
+    const cleaned = titleText.trim().replace(/[^\p{L}\p{N}\s\-+]/gu, '').trim().replace(/\s+/g, '+');
+    return cleaned || '-';
   }
 
   // Wyszukiwanie dokładnego adresu URL filmu/serialu na Filmwebie
-  async function getDirectFilmwebUrl(title, year, originalTitle) {
-    const cacheKey = `${title}_${originalTitle || ''}_${year || ''}`;
+  async function getDirectFilmwebUrl(title, year, originalTitle, jellyfinType) {
+    const expectedType = jellyfinTypeToFilmweb(jellyfinType);
+    const cacheKey = `${title}_${originalTitle || ''}_${year || ''}_${expectedType || ''}`;
     if (filmwebCache[cacheKey]) {
       return filmwebCache[cacheKey];
     }
 
-    // Priorytetowe zapytania: tytuł + rok -> oryginalny tytuł + rok -> sam tytuł
-    const queries = [];
-    if (year) {
-      if (title) queries.push(`${title} ${year}`);
-      if (originalTitle && originalTitle !== title) queries.push(`${originalTitle} ${year}`);
-    }
-    if (title) queries.push(title);
-    if (originalTitle && originalTitle !== title) queries.push(originalTitle);
+    const wantedTitlesNorm = [...titleBaseForms(title), ...titleBaseForms(originalTitle)]
+      .map(normalizeTitle)
+      .filter(Boolean);
+    const wantedYearNum = year ? Number(year) : null;
+    const queries = buildSearchQueries(title, year, originalTitle);
+    const SCORE_THRESHOLD = 60;
 
     for (const q of queries) {
       const apiUrl = `https://www.filmweb.pl/api/v1/live/search?query=${encodeURIComponent(q)}`;
 
+      let data = null;
       try {
-        const data = await fetchFilmwebApi(apiUrl);
-        if (data && data.searchHits && data.searchHits.length > 0) {
-          const top = data.searchHits[0];
-          const itemType = top.type === 'serial' ? 'serial' : 'film';
-          const itemId = top.id;
-
-          let exactTitle = top.matchedTitle || title || originalTitle;
-          let exactYear = year;
-
-          // Pobierz dokładny rok i tytuł z encji Filmweba
-          try {
-            const infoUrl = `https://www.filmweb.pl/api/v1/${itemType}/${itemId}/info`;
-            const infoData = await fetchFilmwebApi(infoUrl);
-            if (infoData) {
-              if (infoData.title) exactTitle = infoData.title;
-              if (infoData.year) exactYear = infoData.year;
-            }
-          } catch (e) {
-            console.debug('[Jellyfin-Filmweb] Błąd info API:', e);
-          }
-
-          // Formatowanie slug na Filmwebie (spacje jako "+")
-          const cleanSlug = exactTitle.trim().replace(/\s+/g, '+');
-
-          let directUrl = "";
-          if (exactYear) {
-            directUrl = `https://www.filmweb.pl/${itemType}/${cleanSlug}-${exactYear}-${itemId}`;
-          } else {
-            directUrl = `https://www.filmweb.pl/${itemType}/${cleanSlug}-${itemId}`;
-          }
-
-          filmwebCache[cacheKey] = directUrl;
-          return directUrl;
-        }
+        data = await fetchFilmwebApi(apiUrl);
       } catch (err) {
         console.debug('[Jellyfin-Filmweb] Błąd API dla query:', q, err);
+        continue;
+      }
+
+      const hits = (data && data.searchHits ? data.searchHits : [])
+        .filter(h => h && (h.type === 'film' || h.type === 'serial'))
+        .slice(0, 8);
+      if (!hits.length) continue;
+
+      let best = null;
+      for (const hit of hits) {
+        const candidateType = hit.type === 'serial' ? 'serial' : 'film';
+        // Ścisły typ: Movie nigdy nie idzie w serial i odwrotnie (gdy typ znany z Jellyfina)
+        if (expectedType && candidateType !== expectedType) continue;
+
+        let infoTitle = hit.matchedTitle || '';
+        let infoYear = null;
+
+        // Pobierz dokładny rok i tytuł z encji Filmweba
+        try {
+          const infoUrl = `https://www.filmweb.pl/api/v1/${candidateType}/${hit.id}/info`;
+          const infoData = await fetchFilmwebApi(infoUrl);
+          if (infoData) {
+            if (infoData.title) infoTitle = infoData.title;
+            if (infoData.year) infoYear = infoData.year;
+          }
+        } catch (e) {
+          console.debug('[Jellyfin-Filmweb] Błąd info API:', e);
+        }
+
+        const score = scoreCandidate(
+          { infoTitle, infoYear, candidateType, matchedTitle: hit.matchedTitle },
+          { wantedTitlesNorm, wantedYearNum, expectedType }
+        );
+        if (score < SCORE_THRESHOLD) continue;
+
+        if (!best || score > best.score) {
+          best = { score, id: hit.id, type: candidateType, title: infoTitle, year: infoYear || wantedYearNum };
+        }
+        if (score >= 100) break;
+      }
+
+      if (best) {
+        const cleanSlug = buildFilmwebSlug(best.title || title || originalTitle);
+
+        let directUrl = "";
+        if (best.year) {
+          directUrl = `https://www.filmweb.pl/${best.type}/${cleanSlug}-${best.year}-${best.id}`;
+        } else {
+          directUrl = `https://www.filmweb.pl/${best.type}/${cleanSlug}-${best.id}`;
+        }
+
+        filmwebCache[cacheKey] = directUrl;
+        return directUrl;
       }
     }
 
-    // Fallback w razie braku wyników w API
+    // Fallback w razie braku pewnego dopasowania: strona wyników wyszukiwania (użytkownik wybiera ręcznie)
     const fallbackTitle = originalTitle || title;
     const fallbackUrl = `https://www.filmweb.pl/search?q=${encodeURIComponent(year ? `${fallbackTitle} ${year}` : fallbackTitle)}`;
     filmwebCache[cacheKey] = fallbackUrl;
@@ -178,6 +302,7 @@
     let title = "";
     let originalTitle = "";
     let year = "";
+    let jellyfinType = "";
     let directFilmwebUrl = "";
 
     const apiClient = getApiClient();
@@ -195,6 +320,7 @@
         if (getActiveItemId() !== itemId) return;
 
         if (item) {
+          jellyfinType = item.Type || "";
           if (item.Type === 'Episode' && item.SeriesName) {
             title = item.SeriesName;
             originalTitle = item.SeriesOriginalTitle || item.SeriesName;
@@ -292,10 +418,13 @@
         btn.href = directFilmwebUrl;
         btn.setAttribute('data-resolved-url', directFilmwebUrl);
       } else if (!btn.getAttribute('data-resolved-url')) {
-        getDirectFilmwebUrl(title, year, originalTitle).then(resolvedUrl => {
+        getDirectFilmwebUrl(title, year, originalTitle, jellyfinType).then(resolvedUrl => {
           if (resolvedUrl && btn && btn.isConnected && getActiveItemId() === itemId && btn.getAttribute('data-itemid') === itemId) {
             btn.href = resolvedUrl;
             btn.setAttribute('data-resolved-url', resolvedUrl);
+            btn.title = resolvedUrl.includes('/search?q=')
+              ? 'Nie znaleziono pewnego dopasowania – otwórz wyniki wyszukiwania na Filmwebie'
+              : 'Otwórz na Filmwebie';
           }
         });
       }
