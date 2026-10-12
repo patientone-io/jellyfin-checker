@@ -107,8 +107,8 @@ Built for household members — when someone finds a movie that's not on your Je
 | IMDb | `imdb.com/title/tt*` | Provider ID (imdb) |
 | IMDb | `imdb.com/name/nm*` | Person name |
 | IMDb (mobile) | `m.imdb.com/title/tt*` | Provider ID (imdb) |
-| Filmweb | `filmweb.pl/film/*` | h2 original title → LD+JSON IMDb ID → fuzzy |
-| Filmweb | `filmweb.pl/serial/*` | h2 original title → LD+JSON IMDb ID → fuzzy |
+| Filmweb | `filmweb.pl/film/*` | Filmweb API /info → LD+JSON → fuzzy |
+| Filmweb | `filmweb.pl/serial/*` | Series, seasons (`/season/*`), episodes — Filmweb API /info → partOfSeries / fuzzy |
 | Filmweb | `filmweb.pl/person/*` | Person name (cleaned) |
 | TMDb | `themoviedb.org/movie/*` | Provider ID (tmdb) |
 | TMDb | `themoviedb.org/tv/*` | Provider ID (tmdb) |
@@ -146,9 +146,16 @@ jellyfin-checker/
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Browser extension | 1.0.2 | `chrome/` + `firefox/` manifests, popup footer, `background.js` auth header |
+| Browser extension | 1.0.2 | Chrome Web Store (published), `chrome/` + `firefox/` manifests, popup footer |
 | `jellyfin-checker.user.js` | 1.0.2 | Standalone userscript, versioned with extension |
 | `jellyfin-to-filmweb.user.js` | 1.4.0 | Separate bridge project in the same monorepo, versioned independently |
+
+#### What's new in v1.0.2
+
+- **Filmweb TV seasons & episodes:** Visiting any season (`/season/*`) or episode (`/episode/*`) page now accurately checks availability of the parent TV series on Jellyfin.
+- **Filmweb internal API lookups:** Direct querying of `/api/v1/serial/{id}/info` retrieves exact Polish/original titles and premiere years.
+- **TV title sanitization:** Automatic cleaning of `Sezon X`, `Season X`, and `Odcinek Y` suffixes from fallback queries.
+- **Unified versioning:** Browser extension and `jellyfin-checker.user.js` are fully synchronized at v1.0.2.
 
 ### Security & Privacy
 
@@ -277,8 +284,8 @@ Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Fi
 | IMDb | `imdb.com/title/tt*` | ID providera (imdb) |
 | IMDb | `imdb.com/name/nm*` | Nazwa osoby |
 | IMDb (mobile) | `m.imdb.com/title/tt*` | ID providera (imdb) |
-| Filmweb | `filmweb.pl/film/*` | h2 oryginalny tytuł → LD+JSON IMDb ID → fuzzy |
-| Filmweb | `filmweb.pl/serial/*` | h2 oryginalny tytuł → LD+JSON IMDb ID → fuzzy |
+| Filmweb | `filmweb.pl/film/*` | API Filmwebu /info → LD+JSON → fuzzy |
+| Filmweb | `filmweb.pl/serial/*` | Serial, sezony (`/season/*`), odcinki — API Filmwebu /info → partOfSeries / fuzzy |
 | Filmweb | `filmweb.pl/person/*` | Nazwa osoby (oczyszczona) |
 | TMDb | `themoviedb.org/movie/*` | ID providera (tmdb) |
 | TMDb | `themoviedb.org/tv/*` | ID providera (tmdb) |
@@ -316,9 +323,16 @@ jellyfin-checker/
 
 | Komponent | Wersja | Uwagi |
 |-----------|--------|-------|
-| Rozszerzenie przeglądarki | 1.0.2 | manifesty `chrome/` + `firefox/`, stopka popupu, nagłówek auth w `background.js` |
+| Rozszerzenie przeglądarki | 1.0.2 | Chrome Web Store (opublikowane), manifesty `chrome/` + `firefox/`, stopka popupu |
 | `jellyfin-checker.user.js` | 1.0.2 | Samodzielny userscript, wersjonowany wspólnie z rozszerzeniem |
 | `jellyfin-to-filmweb.user.js` | 1.4.0 | Osobny mostek w tym samym monorepo, wersjonowany niezależnie |
+
+#### Co nowego w v1.0.2
+
+- **Obsługa sezonów i odcinków Filmwebu:** Wejście na podstronę konkretnego sezonu (`/season/*`) lub odcinka (`/episode/*`) poprawnie sprawdza dostępność całego serialu na serwerze Jellyfin.
+- **Odpytywanie wewnętrznego API:** Pobieranie metadanych bezpośrednio z API Filmwebu (`/info`) zapewnia dokładny polski i oryginalny tytuł oraz rok premiery.
+- **Sanityzacja tytułów seriali:** Automatyczne usuwanie dopisków typu „Sezon X” / „Odcinek Y” przy zapytaniach fallbackowych.
+- **Ujednolicenie wersji:** Wersje wtyczki oraz skryptu Tampermonkey `jellyfin-checker.user.js` zostały zrównane do v1.0.2 (z automatycznym czyszczeniem pamięci podręcznej po aktualizacji).
 
 ### Bezpieczeństwo i prywatność
 
