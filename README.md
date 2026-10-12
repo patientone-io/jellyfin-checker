@@ -12,7 +12,7 @@
 
 A browser extension that checks in real-time if movies, shows, or people are available on your Jellyfin server while browsing **IMDb**, **Filmweb**, or **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-1.0.1-blue)
+![version](https://img.shields.io/badge/version-1.0.2-blue)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Features
@@ -135,7 +135,7 @@ jellyfin-checker/
 │   └── manifest.json   # Chrome manifest (MV3, service_worker)
 ├── firefox/
 │   └── manifest.json   # Firefox manifest (MV3, scripts, options_ui)
-├── userscripts/        # Standalone Tampermonkey scripts (jellyfin-checker 1.0.0 & jellyfin-to-filmweb 1.3.1)
+├── userscripts/        # Standalone Tampermonkey scripts (jellyfin-checker 1.0.2 & jellyfin-to-filmweb 1.4.0)
 ├── build.sh            # Build script — run: bash build.sh <chrome|firefox>
 ├── .gitignore
 ├── LICENSE
@@ -146,9 +146,9 @@ jellyfin-checker/
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Browser extension | 1.0.1 | `chrome/` + `firefox/` manifests, popup footer, `background.js` auth header |
-| `jellyfin-checker.user.js` | 1.0.0 | Standalone userscript, versioned independently |
-| `jellyfin-to-filmweb.user.js` | 1.3.1 | Separate bridge project in the same monorepo, versioned independently |
+| Browser extension | 1.0.2 | `chrome/` + `firefox/` manifests, popup footer, `background.js` auth header |
+| `jellyfin-checker.user.js` | 1.0.2 | Standalone userscript, versioned with extension |
+| `jellyfin-to-filmweb.user.js` | 1.4.0 | Separate bridge project in the same monorepo, versioned independently |
 
 ### Security & Privacy
 
@@ -182,7 +182,7 @@ Copyright © 2026 patientone
 
 Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, serial lub osoba znajduje się na Twoim serwerze Jellyfin — podczas przeglądania **IMDb**, **Filmweb** lub **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-1.0.1-blue)
+![version](https://img.shields.io/badge/version-1.0.2-blue)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Funkcje
@@ -316,9 +316,9 @@ jellyfin-checker/
 
 | Komponent | Wersja | Uwagi |
 |-----------|--------|-------|
-| Rozszerzenie przeglądarki | 1.0.1 | manifesty `chrome/` + `firefox/`, stopka popupu, nagłówek auth w `background.js` |
-| `jellyfin-checker.user.js` | 1.0.0 | Samodzielny userscript, wersjonowany niezależnie |
-| `jellyfin-to-filmweb.user.js` | 1.3.1 | Osobny mostek w tym samym monorepo, wersjonowany niezależnie |
+| Rozszerzenie przeglądarki | 1.0.2 | manifesty `chrome/` + `firefox/`, stopka popupu, nagłówek auth w `background.js` |
+| `jellyfin-checker.user.js` | 1.0.2 | Samodzielny userscript, wersjonowany wspólnie z rozszerzeniem |
+| `jellyfin-to-filmweb.user.js` | 1.4.0 | Osobny mostek w tym samym monorepo, wersjonowany niezależnie |
 
 ### Bezpieczeństwo i prywatność
 

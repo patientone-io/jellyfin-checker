@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jellyfin Checker
 // @namespace    patientone.io
-// @version      1.0.0
+// @version      1.0.2
 // @description  Checks if movies, shows, or people are available on your Jellyfin server. Works with IMDb, Filmweb, and TMDb.
 // @author       patientone
 // @match        https://www.imdb.com/*
@@ -285,7 +285,7 @@
   function getJellyfinHeaders(apiKey) {
     const headers = {};
     if (apiKey) {
-      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.0", Token="${apiKey}"`;
+      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.2", Token="${apiKey}"`;
       headers["X-Emby-Token"] = apiKey;
     }
     return headers;
@@ -511,15 +511,17 @@
       const match = url.match(/name\/(nm[\d]+)/);
       return match ? { name: "imdb-person", id: match[1] } : { name: "imdb-person" };
     }
-    if (url.includes("filmweb.pl/film/") || url.includes("filmweb.pl/serial/")) {
-      let path = url.split(/[?#]/)[0];
-      path = path.split("/episode/")[0];
-      const nums = path.match(/\d+/g);
-      return { name: "filmweb", id: nums ? nums[nums.length - 1] : null };
+    const filmwebMediaMatch = url.match(/filmweb\.pl\/(film|serial)\/([^/?#]+)/);
+    if (filmwebMediaMatch) {
+      const slug = filmwebMediaMatch[2];
+      const idMatch = slug.match(/-(\d+)$/);
+      return { name: "filmweb", id: idMatch ? idMatch[1] : null };
     }
-    if (url.includes("filmweb.pl/person/")) {
-      const match = url.match(/-([0-9]+)$/);
-      return match ? { name: "filmweb-person", id: match[1] } : { name: "filmweb-person" };
+    const filmwebPersonMatch = url.match(/filmweb\.pl\/person\/([^/?#]+)/);
+    if (filmwebPersonMatch) {
+      const slug = filmwebPersonMatch[1];
+      const idMatch = slug.match(/-(\d+)$/);
+      return { name: "filmweb-person", id: idMatch ? idMatch[1] : null };
     }
     if (url.includes("themoviedb.org/person/")) {
       const match = url.match(/\/(\d+)/);
@@ -639,10 +641,16 @@
     let imdbId = null;
     const isTv = window.location.href.includes("/serial/");
 
-    // 1. Try URL regex for year (e.g. /film/Together-2025-10071441)
-    const urlMatch = window.location.pathname.match(/-(\d{4})-(\d+)(?:[?#]|$)/);
-    if (urlMatch) {
-      year = parseInt(urlMatch[1]);
+    // 1. Try URL slug for year and filmwebId
+    const slugMatch = window.location.pathname.match(/\/(?:film|serial)\/([^/?#]+)/);
+    const slug = slugMatch ? slugMatch[1] : "";
+    const yearMatch = slug.match(/-(\d{4})-(\d+)$/);
+    if (yearMatch) {
+      year = parseInt(yearMatch[1]);
+      if (!filmwebId) filmwebId = yearMatch[2];
+    } else if (!filmwebId) {
+      const idMatch = slug.match(/-(\d+)$/);
+      if (idMatch) filmwebId = idMatch[1];
     }
 
     // 2. Fetch Filmweb internal API (fast, authoritative metadata)
@@ -667,7 +675,10 @@
     const ldObjects = getLdJsonObjects();
     for (const data of ldObjects) {
       const type = data['@type'];
-      if (type === 'Movie' || type === 'TVSeries' || type === 'TVSeason' || type === 'TVEpisode' || type === 'CreativeWork') {
+      if (type === 'TVEpisode' || type === 'TVSeason') {
+        if (!title && data.partOfSeries && data.partOfSeries.name) title = cleanText(data.partOfSeries.name);
+        if (!title && data.name) title = cleanText(data.name);
+      } else if (type === 'Movie' || type === 'TVSeries' || type === 'CreativeWork') {
         if (!title && data.name) title = cleanText(data.name);
         if (!originalTitle && data.alternateName) originalTitle = cleanText(data.alternateName);
         if (!year) {
@@ -690,9 +701,30 @@
     }
 
     // 4. Fallback DOM selectors for title
+    if (!title && isTv) {
+      // For TV series season/episode pages, look for parent series link or microdata first
+      const seriesEl = document.querySelector("[itemprop='partOfSeries'] [itemprop='name'], .filmHeaderSection__season a, .breadcrumbs__item--cropper .breadcrumbs__link");
+      if (seriesEl) title = cleanText(seriesEl.textContent);
+    }
     if (!title) {
       const t = document.querySelector("h1.filmCoverSection__title, h1[itemprop='name'], .filmCoverSection__title, .filmHeaderSection__title, h1");
       if (t) title = cleanText(t.textContent);
+    }
+    if (!title && slug) {
+      // Fallback: extract title from decoded URL slug
+      const rawTitle = slug.replace(/-(\d{4})-(\d+)$/, "").replace(/-(\d+)$/, "").replace(/\+/g, " ");
+      try {
+        title = cleanText(decodeURIComponent(rawTitle));
+      } catch {
+        title = cleanText(rawTitle);
+      }
+    }
+
+    // Clean season / episode suffixes for TV series
+    if (isTv) {
+      const stripTvSuffix = s => s ? s.replace(/\s*[:|–—-]?\s*(?:Sezon|Season|Odcinek|Episode)\s+\d+.*$/i, "").trim() : s;
+      if (title) title = stripTvSuffix(title);
+      if (originalTitle) originalTitle = stripTvSuffix(originalTitle);
     }
 
     // 5. Fallback DOM selectors for year if still missing
@@ -1297,10 +1329,10 @@
 
   // --- App Bootstrap ---
   async function run(bypassCache = false) {
-    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.0...");
+    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.2...");
 
     // Auto-clear cache on version upgrade
-    const CURRENT_VERSION = "1.0.0";
+    const CURRENT_VERSION = "1.0.2";
     const storedVer = GM_getValue("last_installed_version", "");
     if (storedVer !== CURRENT_VERSION) {
       GM_setValue("search_cache_data", {});

@@ -104,7 +104,7 @@ async function handleSearch(params) {
   }
 
   const urls = config.jellyfin_urls;
-  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.1", Token="${config.jellyfin_api_key}"`;
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.2", Token="${config.jellyfin_api_key}"`;
   const headers = {
     "Authorization": authHeader,
     "X-Emby-Token": config.jellyfin_api_key,
@@ -213,7 +213,7 @@ function extractYear(item) {
 
 async function testConnection(url, apiKey) {
   const base = url.replace(/\/$/, "");
-  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.1", Token="${apiKey}"`;
+  const authHeader = `MediaBrowser Client="Jellyfin Checker", Device="Chrome Extension", DeviceId="jellyfin-checker-ext", Version="1.0.2", Token="${apiKey}"`;
   const headers = { "Authorization": authHeader, "X-Emby-Token": apiKey, "accept": "application/json" };
   
   // 1. Try authenticated /System/Info first to verify API key
