@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jellyfin Checker
 // @namespace    patientone.io
-// @version      1.0.2
+// @version      1.0.3
 // @description  Checks if movies, shows, or people are available on your Jellyfin server. Works with IMDb, Filmweb, and TMDb.
 // @author       patientone
 // @match        https://www.imdb.com/*
@@ -36,7 +36,7 @@
     enable_sound_notifications: false
   };
 
-  const JELLYFIN_ICON = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><path fill='%2300A4DC' d='M50 5C25.1 5 5 25.1 5 50s20.1 45 45 45 45-20.1 45-45S74.9 5 50 5zm0 18.5c14.6 0 26.5 11.9 26.5 26.5S64.6 76.5 50 76.5 23.5 64.6 23.5 50 35.4 23.5 50 23.5z'/><path fill='%23AA00FF' d='M50 33.5c-9.1 0-16.5 7.4-16.5 16.5s7.4 16.5 16.5 16.5 16.5-7.4 16.5-16.5-7.4-16.5-16.5-16.5z'/></svg>";
+  const JELLYFIN_ICON = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 128 128'><defs><linearGradient id='lg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%2300D2FF'/><stop offset='50%25' stop-color='%230082C8'/><stop offset='100%25' stop-color='%237928CA'/></linearGradient><linearGradient id='cg' x1='0%25' y1='0%25' x2='100%25' y2='100%25'><stop offset='0%25' stop-color='%234EFA8A'/><stop offset='100%25' stop-color='%2300D084'/></linearGradient></defs><circle cx='50' cy='50' r='34' fill='none' stroke='url(%23lg)' stroke-width='12'/><path d='M75 75 L106 106' stroke='url(%23lg)' stroke-width='14' stroke-linecap='round'/><path d='M36 50 L47 62 L67 36' fill='none' stroke='url(%23cg)' stroke-width='9' stroke-linecap='round' stroke-linejoin='round'/></svg>";
 
   const i18n = {
     pl: {
@@ -59,6 +59,9 @@
       reqErrFallback: "Błąd wysyłania",
       closeTitle: "Zamknij",
       settingsTitle: "Ustawienia Jellyfin Checker",
+      headingServer: "Serwer Jellyfin",
+      headingTelegram: "Telegram",
+      headingSettings: "Ustawienia",
       urlLabel: "Jellyfin URL #1",
       urlLabelExt: "Jellyfin URL #2 (Opcjonalny)",
       keyLabel: "Klucz API",
@@ -98,6 +101,9 @@
       reqErrFallback: "Send failed",
       closeTitle: "Close",
       settingsTitle: "Jellyfin Checker Settings",
+      headingServer: "Jellyfin Server",
+      headingTelegram: "Telegram",
+      headingSettings: "Settings",
       urlLabel: "Jellyfin URL #1",
       urlLabelExt: "Jellyfin URL #2 (Optional)",
       keyLabel: "API Key",
@@ -243,6 +249,7 @@
   const normalizeStr = s => s ? s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/[\s\u00A0]+/g, " ").trim() : "";
 
   function titleSimilarMatch(item, target) {
+    if (!item || !target) return false;
     // Strip common leading articles in multiple languages
     const strip = s => s.replace(/^(the|a|an|el|la|le|les|o|w|y)\s+/i, "").trim();
     const cleanItem = strip(item);
@@ -285,7 +292,7 @@
   function getJellyfinHeaders(apiKey) {
     const headers = {};
     if (apiKey) {
-      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.2", Token="${apiKey}"`;
+      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.3", Token="${apiKey}"`;
       headers["X-Emby-Token"] = apiKey;
     }
     return headers;
@@ -296,21 +303,8 @@
     const headers = getJellyfinHeaders(apiKey);
     try {
       // Wywołujemy /System/Info, które wymaga autoryzacji i faktycznie weryfikuje poprawność klucza API
-      let resp = await gmFetch(`${base}/System/Info`, {
-        headers,
-        timeout: 5000
-      });
-      if (!resp.ok) {
-        if (resp.status === 401 || resp.status === 403) {
-          throw new Error(`HTTP ${resp.status} (Niepoprawny klucz API / brak autoryzacji)`);
-        }
-        // Fallback do /System/Info/Public jeśli serwer ogranicza dostęp do /System/Info
-        resp = await gmFetch(`${base}/System/Info/Public`, {
-          headers,
-          timeout: 5000
-        });
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      }
+      const resp = await gmFetch(`${base}/System/Info`, { headers, timeout: 5000 });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
       return { success: true, serverName: data.ServerName || "Jellyfin", version: data.Version };
     } catch (e) {
@@ -324,7 +318,8 @@
       const resp = await gmFetch(`${base}/Items?IncludeItemTypes=Movie,Series&Recursive=true&Person=${encodeURIComponent(params.title)}&Limit=30`, { headers, timeout: 5000 });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const data = await resp.json();
-      const items = data.Items || [];
+      if (!Array.isArray(data.Items)) throw new Error("Invalid Jellyfin response");
+      const items = data.Items;
       if (items.length > 0) {
         return {
           found: true,
@@ -367,7 +362,8 @@
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     
     const data = await resp.json();
-    const items = data.Items || [];
+    if (!Array.isArray(data.Items)) throw new Error("Invalid Jellyfin response");
+    const items = data.Items;
 
     const target = normalizeStr(searchTitle);
     const origTarget = params.originalTitle ? normalizeStr(params.originalTitle) : null;
@@ -385,7 +381,8 @@
       if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
 
       const data2 = await resp2.json();
-      const items2 = data2.Items || [];
+      if (!Array.isArray(data2.Items)) throw new Error("Invalid Jellyfin response");
+      const items2 = data2.Items;
 
       for (const item of items2) {
         if (isItemMatching(item, target, origTarget, params.year)) {
@@ -418,26 +415,20 @@
       sortedUrls.unshift(lastWorkingUrl);
     }
 
-    // Run parallel searches with Promise.any
-    const searchPromises = sortedUrls.map(async (raw) => {
-      const base = raw.replace(/\/$/, '');
+    let completed = false;
+    let lastError;
+    for (const raw of sortedUrls) {
+      const base = raw.replace(/\/$/, "");
       try {
-        const res = await searchOnServer(base, params, headers);
-        // Zapisz pomyślne połączenie
+        const result = await searchOnServer(base, params, headers);
         GM_setValue("last_working_url", raw);
-        return res;
-      } catch (err) {
-        console.warn(`[JK] Server search failed on ${raw}:`, err);
-        throw err;
+        if (result.found) return result;
+        completed = true;
+      } catch (error) {
+        lastError = error;
       }
-    });
-
-    try {
-      return await Promise.any(searchPromises);
-    } catch (e) {
-      console.error("[JK] All server search attempts failed:", e.errors || e);
-      return { found: false, error: "All servers unreachable" };
     }
+    return completed ? { found: false } : { found: false, error: lastError?.message || "Search failed" };
   }
 
   // --- Telegram Messaging ---
@@ -451,8 +442,7 @@
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           chat_id: chatId,
-          text: "🟢 *Jellyfin Checker Userscript*\nConnection test successful!",
-          parse_mode: "Markdown"
+          text: "🟢 Jellyfin Checker Userscript\nConnection test successful!"
         })
       });
       const data = await resp.json();
@@ -472,13 +462,13 @@
 
     const type = meta.type === "tv" ? "Serial" : "Film";
     const lines = [
-      `🎬 *Prośba o dodanie ${type?.toLowerCase()}*`,
-      `*Tytuł:* ${meta.title}`,
-      meta.year ? `*Rok:* ${meta.year}` : null,
-      meta.imdbId ? `*IMDb:* [${meta.imdbId}](https://www.imdb.com/title/${meta.imdbId})` : null,
-      meta.tmdbId ? `*TMDb:* [${meta.tmdbId}](https://www.themoviedb.org/${meta.type}/${meta.tmdbId})` : null,
-      `*Źródło:* [link](${sourceURL})`,
-      `*Data:* ${new Date().toLocaleString("pl-PL")}`
+      `🎬 Prośba o dodanie ${type.toLowerCase()}`,
+      `Tytuł: ${meta.title}`,
+      meta.year ? `Rok: ${meta.year}` : null,
+      meta.imdbId ? `IMDb: https://www.imdb.com/title/${meta.imdbId}` : null,
+      meta.tmdbId ? `TMDb: https://www.themoviedb.org/${meta.type}/${meta.tmdbId}` : null,
+      `Źródło: ${sourceURL}`,
+      `Data: ${new Date().toLocaleString("pl-PL")}`
     ].filter(Boolean).join("\n");
 
     try {
@@ -488,7 +478,6 @@
         body: JSON.stringify({
           chat_id: chatId,
           text: lines,
-          parse_mode: "Markdown",
           disable_notification: true
         })
       });
@@ -503,6 +492,13 @@
   // --- Site detection & Metadata extraction ---
   function detectSite() {
     const url = window.location.href;
+    const parsedURL = new URL(url);
+    if (parsedURL.hostname === "filmweb.pl" || parsedURL.hostname === "www.filmweb.pl") {
+      // Main title/person cards and series seasons; other subpages are excluded.
+      const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/season\/\d+)?\/?$/);
+      if (!match || (match[3] && match[1] !== "serial")) return null;
+      return { name: match[1] === "person" ? "filmweb-person" : "filmweb", id: match[2] };
+    }
     if (url.includes("imdb.com/title/")) {
       const match = url.match(/title\/(tt[\d]+)/);
       return match ? { name: "imdb", id: match[1] } : { name: "imdb" };
@@ -510,18 +506,6 @@
     if (url.includes("imdb.com/name/")) {
       const match = url.match(/name\/(nm[\d]+)/);
       return match ? { name: "imdb-person", id: match[1] } : { name: "imdb-person" };
-    }
-    const filmwebMediaMatch = url.match(/filmweb\.pl\/(film|serial)\/([^/?#]+)/);
-    if (filmwebMediaMatch) {
-      const slug = filmwebMediaMatch[2];
-      const idMatch = slug.match(/-(\d+)$/);
-      return { name: "filmweb", id: idMatch ? idMatch[1] : null };
-    }
-    const filmwebPersonMatch = url.match(/filmweb\.pl\/person\/([^/?#]+)/);
-    if (filmwebPersonMatch) {
-      const slug = filmwebPersonMatch[1];
-      const idMatch = slug.match(/-(\d+)$/);
-      return { name: "filmweb-person", id: idMatch ? idMatch[1] : null };
     }
     if (url.includes("themoviedb.org/person/")) {
       const match = url.match(/\/(\d+)/);
@@ -823,7 +807,6 @@
     return h1 ? { tmdbId, title: h1.textContent.trim(), year: null, type } : null;
   }
 
-  // (extractTMDBPerson and waitForElement remain unchanged...)
   function extractTMDBPerson(personId) {
     const nextData = document.getElementById("__NEXT_DATA__");
     if (nextData) {
@@ -844,18 +827,23 @@
     return new Promise((resolve) => {
       const el = document.querySelector(selector);
       if (el) return resolve(el);
-      const start = Date.now();
+      const finish = (result) => {
+        clearTimeout(timer);
+        observer.disconnect();
+        resolve(result);
+      };
       const observer = new MutationObserver(() => {
         const el = document.querySelector(selector);
-        if (el) { observer.disconnect(); resolve(el); return; }
-        if (Date.now() - start > maxWait) { observer.disconnect(); resolve(null); }
+        if (el) finish(el);
       });
+      const timer = setTimeout(() => finish(null), maxWait);
       observer.observe(document.body, { childList: true, subtree: true });
     });
   }
 
   // --- Badge Injection UI ---
   function showBadge(text, url, gradient, requestable = null, metadata = null) {
+    const t = i18n[getLang()] || i18n.en;
     removeExistingBadge();
 
     const wrapper = document.createElement("div");
@@ -932,7 +920,7 @@
     // Close button
     const closeBtn = document.createElement("button");
     closeBtn.textContent = "\u00D7";
-    closeBtn.title = "Close";
+    closeBtn.title = t.closeTitle;
     closeBtn.style.cssText = "background:rgba(0,0,0,.15);color:rgba(255,255,255,.6);border:none;font-size:20px;padding:0 10px;cursor:pointer;line-height:1;flex-shrink:0;";
     closeBtn.addEventListener("click", (e) => {
       e.stopPropagation();
@@ -946,7 +934,7 @@
     if (url && url !== "#") {
       container.addEventListener("click", (e) => {
         if (e.target === closeBtn || e.target === gearBtn || e.target === refreshBtn) return;
-        window.open(url, "_blank");
+        window.open(url, "_blank", "noopener");
       });
       container.addEventListener("mouseenter", () => { container.style.filter = "brightness(1.12)"; });
       container.addEventListener("mouseleave", () => { container.style.filter = "none"; });
@@ -1328,11 +1316,16 @@
   GM_registerMenuCommand("Settings / Ustawienia", openSettings);
 
   // --- App Bootstrap ---
+  let checkGeneration = 0;
   async function run(bypassCache = false) {
-    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.2...");
+    const generation = ++checkGeneration;
+    const sourceURL = window.location.href;
+    const isCurrent = () => generation === checkGeneration && sourceURL === window.location.href;
+    const render = (...args) => { if (isCurrent()) showBadge(...args); };
+    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.3...");
 
     // Auto-clear cache on version upgrade
-    const CURRENT_VERSION = "1.0.2";
+    const CURRENT_VERSION = "1.0.3";
     const storedVer = GM_getValue("last_installed_version", "");
     if (storedVer !== CURRENT_VERSION) {
       GM_setValue("search_cache_data", {});
@@ -1342,7 +1335,10 @@
     }
 
     const site = detectSite();
-    if (!site) return;
+    if (!site) {
+      removeExistingBadge();
+      return;
+    }
 
     // Don't inject on Jellyfin page itself
     const url = window.location.href;
@@ -1352,6 +1348,7 @@
       await waitForElement("h1", 4000);
     }
 
+    if (!isCurrent()) return;
     let metadata = null;
     switch (site.name) {
       case "imdb": metadata = extractIMDB(site.id); break;
@@ -1362,15 +1359,16 @@
       case "tmdb-person": metadata = extractTMDBPerson(site.id); break;
     }
 
+    if (!isCurrent()) return;
     console.log("[JK] Scraped metadata:", metadata);
     if (!metadata || !metadata.title) {
-      showBadge(await badgeText("noTitle"), null, "linear-gradient(135deg, #b45309, #78350f)");
+      render(await badgeText("noTitle"), null, "linear-gradient(135deg, #b45309, #78350f)");
       return;
     }
 
     const config = getConfig();
     if (!config.jellyfin_api_key) {
-      showBadge(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
+      render(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
       return;
     }
 
@@ -1381,16 +1379,17 @@
       console.log("[JK] Cache hit (użyto zapamiętanego wyniku):", response);
     } else {
       isCacheHit = false;
-      showBadge(await badgeText("checking"), null, "linear-gradient(135deg, #4338ca, #1e40af)");
+      render(await badgeText("checking"), null, "linear-gradient(135deg, #4338ca, #1e40af)");
       response = await handleSearch(metadata, config);
+      if (!isCurrent()) return;
       console.log("[JK] Search response:", response);
 
       if (response.configMissing) {
-        showBadge(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
+        render(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
         return;
       }
       if (response.error) {
-        showBadge(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)");
+        render(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)");
         return;
       }
 
@@ -1399,15 +1398,15 @@
 
     if (response.found) {
       if (response.count !== undefined) {
-        showBadge(await badgeText("foundMany", response.count), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+        render(await badgeText("foundMany", response.count), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
       } else {
-        showBadge(await badgeText("found"), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+        render(await badgeText("found"), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
       }
-      if (config.enable_sound_notifications && !isCacheHit) {
+      if (isCurrent() && config.enable_sound_notifications && !isCacheHit) {
         playBeep();
       }
     } else {
-      showBadge(await badgeText("notFound"), null, "linear-gradient(135deg, #1a2f42, #991b1b)", config.enable_request_button, metadata);
+      render(await badgeText("notFound"), null, "linear-gradient(135deg, #1a2f42, #991b1b)", config.enable_request_button, metadata);
     }
   }
 

@@ -24,6 +24,8 @@ const TRANSLATIONS = {
     hintChat: "ID czatu lub grupy (np. -1001234567890)",
     saveTgBtn: "Zapisz",
     testTgBtn: "Test Telegram",
+    noUrls: "Brak skonfigurowanego URL",
+    noResponse: "Brak odpowiedzi rozszerzenia",
     fullOptionsLink: "Pełne okno opcji ↗",
     fillFields: "Podaj URL i klucz API",
     fillTgFields: "Podaj Bot Token i Chat ID",
@@ -56,6 +58,8 @@ const TRANSLATIONS = {
     hintChat: "Chat or group ID (e.g. -1001234567890)",
     saveTgBtn: "Save",
     testTgBtn: "Test Telegram",
+    noUrls: "No URLs configured",
+    noResponse: "No response from the extension",
     fullOptionsLink: "Full options page ↗",
     fillFields: "Fill in URL and API key",
     fillTgFields: "Fill in Bot Token and Chat ID",
@@ -281,30 +285,26 @@ document.addEventListener("DOMContentLoaded", () => {
   testBtn.addEventListener("click", async () => {
     testBtn.disabled = true;
     testBtn.textContent = TRANSLATIONS[currentLang].testingBtn;
-
-    const urls = [urlInput.value.trim()].filter(Boolean);
-    if (extInput && extInput.value.trim()) urls.push(extInput.value.trim());
-    const apiKey = apiKeyInput.value.trim();
-
-    let result;
-    for (const url of urls) {
-      result = await new Promise((resolve) => {
-        chrome.runtime.sendMessage({
-          action: "test_connection",
-          url,
-          apiKey
-        }, resolve);
-      });
-      if (result?.success) break;
-    }
-
-    testBtn.disabled = false;
-    testBtn.textContent = TRANSLATIONS[currentLang].testBtn;
-
-    if (result && result.success) {
-      showStatus("status", TRANSLATIONS[currentLang].connected(result.serverName, result.version), "success");
-    } else {
-      showStatus("status", TRANSLATIONS[currentLang].connectFail(result?.error || "Brak skonfigurowanego URL"), "error");
+    try {
+      const urls = [urlInput.value.trim(), extInput?.value.trim()].filter(Boolean);
+      let result;
+      for (const url of urls) {
+        result = await chrome.runtime.sendMessage({
+          action: "test_connection", url, apiKey: apiKeyInput.value.trim()
+        });
+        if (result?.success) break;
+      }
+      const t = TRANSLATIONS[currentLang];
+      if (result?.success) {
+        showStatus("status", t.connected(result.serverName, result.version), "success");
+      } else {
+        showStatus("status", t.connectFail(result?.error || (urls.length ? t.noResponse : t.noUrls)), "error");
+      }
+    } catch (error) {
+      showStatus("status", TRANSLATIONS[currentLang].connectFail(error.message), "error");
+    } finally {
+      testBtn.disabled = false;
+      testBtn.textContent = TRANSLATIONS[currentLang].testBtn;
     }
   });
 
@@ -332,22 +332,21 @@ document.addEventListener("DOMContentLoaded", () => {
   testTgBtn?.addEventListener("click", async () => {
     testTgBtn.disabled = true;
     testTgBtn.textContent = TRANSLATIONS[currentLang].testingBtn;
-
-    const result = await new Promise((resolve) => {
-      chrome.runtime.sendMessage({
-        action: "test_telegram",
-        botToken: tgTokenInput.value.trim(),
-        chatId: tgChatInput.value.trim()
-      }, resolve);
-    });
-
-    testTgBtn.disabled = false;
-    testTgBtn.textContent = TRANSLATIONS[currentLang].testTgBtn;
-
-    if (result?.ok) {
-      showStatus("status-tg", TRANSLATIONS[currentLang].tgSent, "success");
-    } else {
-      showStatus("status-tg", TRANSLATIONS[currentLang].tgFail(result?.error || "Nieznany błąd"), "error");
+    try {
+      const result = await chrome.runtime.sendMessage({
+        action: "test_telegram", botToken: tgTokenInput.value.trim(), chatId: tgChatInput.value.trim()
+      });
+      const t = TRANSLATIONS[currentLang];
+      if (result?.ok) {
+        showStatus("status-tg", t.tgSent, "success");
+      } else {
+        showStatus("status-tg", t.tgFail(result?.error || t.noResponse), "error");
+      }
+    } catch (error) {
+      showStatus("status-tg", TRANSLATIONS[currentLang].tgFail(error.message), "error");
+    } finally {
+      testTgBtn.disabled = false;
+      testTgBtn.textContent = TRANSLATIONS[currentLang].testTgBtn;
     }
   });
 });

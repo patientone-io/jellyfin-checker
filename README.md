@@ -12,20 +12,20 @@
 
 A browser extension that checks in real-time if movies, shows, or people are available on your Jellyfin server while browsing **IMDb**, **Filmweb**, or **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-1.0.2-blue)
+![version](https://img.shields.io/badge/version-1.0.3-blue)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Features
 
-- **Auto-detection** — recognizes movie/show/person pages automatically
-- **Multiple sources** — works on IMDb, Filmweb, and TMDb
-- **Smart search** — cascading strategy: provider ID → exact title → fuzzy match (Levenshtein)
-- **Multiple URLs** — supports local + remote Jellyfin endpoints
-- **All-in-one popup** — configure server, toggle sound effects, and send Telegram requests directly from the popup
-- **Theme switcher** — System / Dark / Light themes
-- **Telegram** — optional "Request film" button sends a notification via Telegram
-- **Bilingual** — Polish and English UI
-- **Tampermonkey userscripts** — includes standalone userscripts for lightweight setups
+- **Auto-detection** - recognizes movie/show/person pages automatically
+- **Multiple sources** - works on IMDb, Filmweb, and TMDb
+- **Smart search** - cascading strategy: title search → provider ID validation → fuzzy match (Levenshtein)
+- **Multiple URLs** - supports local + remote Jellyfin endpoints
+- **All-in-one popup** - configure server, toggle sound effects, and send Telegram requests directly from the popup
+- **Theme switcher** - System / Dark / Light themes
+- **Telegram** - optional "Request film" button sends a notification via Telegram
+- **Bilingual** - Polish and English UI
+- **Tampermonkey userscripts** - includes standalone userscripts for lightweight setups
 
 ### How it works
 
@@ -39,7 +39,7 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 
 | State | Meaning |
 |-------|---------|
-| ✅ Found | Item exists on Jellyfin — click to open |
+| ✅ Found | Item exists on Jellyfin - click to open |
 | ✅ Found many (person page) | Multiple items found for this person |
 | ❌ Not found | Item missing from Jellyfin |
 | 🔍 Searching | Query in progress |
@@ -53,11 +53,13 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 
 #### Search strategy
 
-1. **Provider ID** — exact match by IMDb ID (`anyProviderIdEquals`)
-2. **TMDb ID** — exact match by TMDb ID
-3. **Person search** — finds items by person name
-4. **Fuzzy search** — title matching with Levenshtein + year validation
-5. **Original title fallback** — for Filmweb, tries the English original title
+1. **Title search** - requests up to 30 movie and series candidates from Jellyfin.
+2. **Provider ID validation** - prefers an exact IMDb or TMDb ID match within those candidates.
+3. **Fuzzy matching** - compares titles and original titles, allowing a year difference of up to two years.
+4. **Original title fallback** - searches again using the original title when available.
+5. **Person search** - searches library items by person name instead of title.
+
+Provider IDs are not queried independently. An item with a different title may be missed if Jellyfin does not include it among the title search results.
 
 ### Installation
 
@@ -65,7 +67,7 @@ A browser extension that checks in real-time if movies, shows, or people are ava
 
 Install directly from the **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
 
-#### Manual installation (Firefox / Development)
+#### Manual installation (Firefox 140+ / Development)
 
 1. Clone this repository: `git clone https://github.com/patientone-io/jellyfin-checker.git`
 2. Build for your browser:
@@ -86,16 +88,16 @@ Install directly from the **[Chrome Web Store](https://chromewebstore.google.com
 
 Click the extension icon in your browser toolbar.
 
-1. **Jellyfin URL** — your server address (e.g. `http://192.168.1.100:8096`)
+1. **Jellyfin URL** - your server address (e.g. `http://192.168.1.100:8096`)
    - Add **Jellyfin URL #2** as fallback (e.g. remote address)
-2. **API Key** — generate in Jellyfin: `Dashboard → Settings → API Keys → + Add API Key`
+2. **API Key** - generate in Jellyfin: `Dashboard → Settings → API Keys → + Add API Key`
 3. Click **Save**, then **Test**
 
 #### Telegram (optional)
 
-Built for household members — when someone finds a movie that's not on your Jellyfin, they can request it via Telegram with one click. No Jellyfin knowledge needed.
+Built for household members - when someone finds a movie that's not on your Jellyfin, they can request it via Telegram with one click. No Jellyfin knowledge needed.
 
-1. Create a bot via [@BotFather](https://t.me/botfather) — `/newbot`
+1. Create a bot via [@BotFather](https://t.me/botfather) - `/newbot`
 2. Get your Chat ID via [@userinfobot](https://t.me/userinfobot)
 3. Enter both in **Settings** (`⚙️ Full settings` in the popup)
 4. Click **Test Telegram**
@@ -104,14 +106,14 @@ Built for household members — when someone finds a movie that's not on your Je
 
 | Site | URL pattern | Search method |
 |------|-------------|--------------|
-| IMDb | `imdb.com/title/tt*` | Provider ID (imdb) |
+| IMDb | `imdb.com/title/tt*` | Title search + IMDb ID validation |
 | IMDb | `imdb.com/name/nm*` | Person name |
-| IMDb (mobile) | `m.imdb.com/title/tt*` | Provider ID (imdb) |
+| IMDb (mobile) | `m.imdb.com/title/tt*` | Title search + IMDb ID validation |
 | Filmweb | `filmweb.pl/film/*` | Filmweb API /info → LD+JSON → fuzzy |
-| Filmweb | `filmweb.pl/serial/*` | Series, seasons (`/season/*`), episodes — Filmweb API /info → partOfSeries / fuzzy |
+| Filmweb | `filmweb.pl/serial/*` | Series card and season pages - Filmweb API /info → fuzzy |
 | Filmweb | `filmweb.pl/person/*` | Person name (cleaned) |
-| TMDb | `themoviedb.org/movie/*` | Provider ID (tmdb) |
-| TMDb | `themoviedb.org/tv/*` | Provider ID (tmdb) |
+| TMDb | `themoviedb.org/movie/*` | Title search + TMDb ID validation |
+| TMDb | `themoviedb.org/tv/*` | Title search + TMDb ID validation |
 | TMDb | `themoviedb.org/person/*` | Person name |
 
 ### File structure
@@ -119,7 +121,7 @@ Built for household members — when someone finds a movie that's not on your Je
 ```
 jellyfin-checker/
 ├── src/                # Shared source files (same for all browsers)
-│   ├── background.js   # Service worker / Event page — Jellyfin API logic
+│   ├── background.js   # Service worker / Event page - Jellyfin API logic
 │   ├── content.js      # Metadata extraction + badge UI
 │   ├── popup.html      # Configuration popup
 │   ├── popup.js        # Popup logic (i18n, save, test)
@@ -135,8 +137,8 @@ jellyfin-checker/
 │   └── manifest.json   # Chrome manifest (MV3, service_worker)
 ├── firefox/
 │   └── manifest.json   # Firefox manifest (MV3, scripts, options_ui)
-├── userscripts/        # Standalone Tampermonkey scripts (jellyfin-checker 1.0.2 & jellyfin-to-filmweb 1.4.0)
-├── build.sh            # Build script — run: bash build.sh <chrome|firefox>
+├── userscripts/        # Standalone Tampermonkey scripts (jellyfin-checker 1.0.3 & jellyfin-to-filmweb 1.4.0)
+├── build.sh            # Build script - run: bash build.sh <chrome|firefox>
 ├── .gitignore
 ├── LICENSE
 └── README.md           # This file
@@ -146,9 +148,19 @@ jellyfin-checker/
 
 | Component | Version | Notes |
 |-----------|---------|-------|
-| Browser extension | 1.0.2 | Chrome Web Store (published), `chrome/` + `firefox/` manifests, popup footer |
-| `jellyfin-checker.user.js` | 1.0.2 | Standalone userscript, versioned with extension |
+| Browser extension | 1.0.3 | Local patch (store release: 1.0.2), `chrome/` + `firefox/` manifests, popup footer |
+| `jellyfin-checker.user.js` | 1.0.3 | Standalone userscript, versioned with extension |
 | `jellyfin-to-filmweb.user.js` | 1.4.0 | Separate bridge project in the same monorepo, versioned independently |
+
+#### What's new in v1.0.3 (local, unpublished)
+
+- On Filmweb, badges appear on main movie, series and person cards, and on series season pages (`/serial/.../season/1`). A season page checks the availability of the parent series. News, rankings, discussions, episode pages and other subpages are excluded.
+
+- Connection failures are distinguished from missing library items; fallback addresses are still checked.
+- Empty titles no longer match arbitrary items, and stale SPA results cannot replace the current badge.
+- Telegram requests use plain text; saving options preserves the theme; closing the badge removes the request button.
+- Bundled `config.json` is loaded on first installation. Updates preserve existing settings.
+- Regression checks run with `node tests/regression.test.cjs` (Node.js 18+).
 
 #### What's new in v1.0.2
 
@@ -159,27 +171,29 @@ jellyfin-checker/
 
 ### Security & Privacy
 
-- **API keys stored in `chrome.storage.local`** — persistent, extension-only access
-- **Default `config.json` contains no secrets** — all credentials configured via UI
-- **No data collection** — no analytics, no third-party requests (except your own Jellyfin and Telegram if configured)
+- **API keys stored in `chrome.storage.local`** - persistent, extension-only access
+- **Default `config.json` contains no secrets** - all credentials configured via UI
+- **No analytics or developer telemetry** - title metadata is sent to your configured Jellyfin server. Filmweb pages also use the Filmweb metadata API. Telegram receives the title and source URL only when you request an item; its test button sends a test message.
+
+Firefox 140+ declares authentication information, website content, and browsing activity in its installation consent. These categories cover credentials sent to the configured services, title metadata, and source links. No data is sent to the developer. See [Mozilla’s data consent documentation](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/).
 
 #### Pre-populating config.json for family
 
-You can edit `config.json` before distribution to pre-fill server URL, API key, and Telegram settings — useful for family members who just need it to work. **Warning**: this stores secrets in plain text. Anyone with access to the extension folder can read them.
+You can edit `src/config.json` before building and distributing a fresh installation to pre-fill server URL, API key, and Telegram settings - useful for family members who just need it to work. The file is read only on first installation; reloading or updating an installed extension preserves its settings. **Warning**: this stores secrets in plain text. Anyone with access to the extension folder can read them.
 
 #### Why does the extension need access to all websites?
 
-Your Jellyfin server can run on any address — `localhost`, a local IP (`192.168.x.x`), or a public domain. Since this can't be predicted at build time, the extension requests broad host permissions. The extension reads page metadata (title, year, IDs) to match your library and injects a status badge — it does not collect data, and connects only to your configured Jellyfin server and optionally Telegram.
+Your Jellyfin server can run on any address - `localhost`, a local IP (`192.168.x.x`), or a public domain. Since this can't be predicted at build time, the extension requests broad host permissions. The extension reads page metadata (title, year, IDs) to match your library and injects a status badge - it sends title metadata to your configured Jellyfin server, uses Filmweb’s metadata API on Filmweb pages, and optionally sends requests through Telegram. There is no analytics service.
 
 ### Contributing
 
 Contributions are welcome! This is a hobby project built for the Jellyfin community.
 
-Ideas, bug reports, and PRs — open an Issue or submit a Pull Request. Found a bug? Include steps to reproduce, browser version, and Jellyfin version. Feature request? Describe what you need and why.
+Ideas, bug reports, and PRs - open an Issue or submit a Pull Request. Found a bug? Include steps to reproduce, browser version, and Jellyfin version. Feature request? Describe what you need and why.
 
 ### License
 
-MIT — use at your own risk.
+MIT - use at your own risk.
 
 Copyright © 2026 patientone
 
@@ -187,22 +201,22 @@ Copyright © 2026 patientone
 
 ## 🇵🇱 Polski
 
-Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, serial lub osoba znajduje się na Twoim serwerze Jellyfin — podczas przeglądania **IMDb**, **Filmweb** lub **The Movie Database (TMDb)**.
+Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, serial lub osoba znajduje się na Twoim serwerze Jellyfin - podczas przeglądania **IMDb**, **Filmweb** lub **The Movie Database (TMDb)**.
 
-![version](https://img.shields.io/badge/version-1.0.2-blue)
+![version](https://img.shields.io/badge/version-1.0.3-blue)
 [![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
 
 ### Funkcje
 
-- **Automatyczne wykrywanie** — rozpoznaje stronę filmu/serialu/osoby bez klikania
-- **Wiele źródeł** — działa na IMDb, Filmweb i TMDb
-- **Inteligentne wyszukiwanie** — strategia kaskadowa: ID providera → dokładny tytuł → fuzzy match (Levenshtein)
-- **Wiele serwerów** — obsługuje kilka adresów Jellyfin (lokalny + zdalny), próbuje każdy po kolei
-- **Wszystko w popupie** — pełna konfiguracja serwera, dźwięków i Telegrama dostępna od razu po kliknięciu ikony
-- **Wybór motywu** — motyw Systemowy, Ciemny i Jasny
-- **Telegram** — opcjonalny przycisk "Poproś o film" wysyła powiadomienie przez Telegrama
-- **Dwujęzyczne** — PL i EN
-- **Skrypty Tampermonkey** — w folderze `userscripts/` dla osób preferujących skrypty użytkownika
+- **Automatyczne wykrywanie** - rozpoznaje stronę filmu/serialu/osoby bez klikania
+- **Wiele źródeł** - działa na IMDb, Filmweb i TMDb
+- **Inteligentne wyszukiwanie** - strategia kaskadowa: wyszukiwanie tytułu → weryfikacja ID providera → fuzzy match (Levenshtein)
+- **Wiele serwerów** - obsługuje kilka adresów Jellyfin (lokalny + zdalny), próbuje każdy po kolei
+- **Wszystko w popupie** - pełna konfiguracja serwera, dźwięków i Telegrama dostępna od razu po kliknięciu ikony
+- **Wybór motywu** - motyw Systemowy, Ciemny i Jasny
+- **Telegram** - opcjonalny przycisk "Poproś o film" wysyła powiadomienie przez Telegrama
+- **Dwujęzyczne** - PL i EN
+- **Skrypty Tampermonkey** - w folderze `userscripts/` dla osób preferujących skrypty użytkownika
 
 ### Jak to działa?
 
@@ -216,7 +230,7 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 
 | Stan | Znaczenie |
 |------|-----------|
-| ✅ Znaleziony | Pozycja jest na Jellyfin — kliknij aby otworzyć |
+| ✅ Znaleziony | Pozycja jest na Jellyfin - kliknij aby otworzyć |
 | ✅ Znaleziono wiele (strona osoby) | Wiele pozycji dla tej osoby |
 | ❌ Nie znaleziony | Brak pozycji na Jellyfin |
 | 🔍 Szukam | Trwa zapytanie |
@@ -230,11 +244,13 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 
 #### Strategia wyszukiwania
 
-1. **ID providera** — dokładne dopasowanie po ID IMDb (`anyProviderIdEquals`)
-2. **ID TMDb** — dokładne dopasowanie po ID TMDb
-3. **Osoba** — wyszukiwanie filmów/seriali po nazwisku osoby
-4. **Fuzzy search** — dopasowanie tytułu z algorytmem Levenshteina + walidacja roku
-5. **Oryginalny tytuł** — dla Filmwebu próbuje też angielski tytuł oryginalny
+1. **Wyszukiwanie tytułu** - pobiera z Jellyfina maksymalnie 30 filmów i seriali pasujących do zapytania.
+2. **Weryfikacja ID providera** - wśród wyników preferuje zgodne ID IMDb lub TMDb.
+3. **Dopasowanie przybliżone** - porównuje tytuły i tytuły oryginalne, dopuszczając różnicę roku do dwóch lat.
+4. **Tytuł oryginalny** - wykonuje kolejne wyszukiwanie po tytule oryginalnym, jeśli jest dostępny.
+5. **Osoby** - zamiast tytułu wyszukuje pozycje biblioteki po nazwisku osoby.
+
+Identyfikatory nie są wyszukiwane niezależnie. Pozycja z innym tytułem może zostać pominięta, jeśli Jellyfin nie zwróci jej w wynikach wyszukiwania po tytule.
 
 ### Instalacja
 
@@ -242,7 +258,7 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy film, ser
 
 Zainstaluj bezpośrednio z **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
 
-#### Instalacja ręczna (Firefox / Tryb deweloperski)
+#### Instalacja ręczna (Firefox 140+ / Tryb deweloperski)
 
 1. Sklonuj repozytorium: `git clone https://github.com/patientone-io/jellyfin-checker.git`
 2. Zbuduj dla swojej przeglądarki:
@@ -263,16 +279,16 @@ Zainstaluj bezpośrednio z **[Chrome Web Store](https://chromewebstore.google.co
 
 Kliknij ikonkę rozszerzenia na pasku przeglądarki.
 
-1. **URL Jellyfin** — adres Twojego serwera (np. `http://192.168.1.100:8096`)
+1. **URL Jellyfin** - adres Twojego serwera (np. `http://192.168.1.100:8096`)
    - Dodaj **Jellyfin URL #2** jako zapasowy (np. adres zdalny)
-2. **Klucz API** — wygeneruj w Jellyfin: `Dashboard → Ustawienia → Klucze API → + Dodaj klucz`
+2. **Klucz API** - wygeneruj w Jellyfin: `Dashboard → Ustawienia → Klucze API → + Dodaj klucz`
 3. Kliknij **Zapisz**, następnie **Test**
 
 #### Telegram (opcjonalnie)
 
-Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Filmweb/TMDb, a nie ma go na Jellyfin, może jednym kliknięciem wysłać Ci prośbę o dodanie przez Telegrama. Nie musi znać się na Jellyfin — wystarczy, że ma włączone rozszerzenie.
+Funkcja stworzona z myślą o domownikach - gdy ktoś znajdzie film na IMDb/Filmweb/TMDb, a nie ma go na Jellyfin, może jednym kliknięciem wysłać Ci prośbę o dodanie przez Telegrama. Nie musi znać się na Jellyfin - wystarczy, że ma włączone rozszerzenie.
 
-1. Stwórz bota przez [@BotFather](https://t.me/botfather) — `/newbot`
+1. Stwórz bota przez [@BotFather](https://t.me/botfather) - `/newbot`
 2. Zdobądź Chat ID przez [@userinfobot](https://t.me/userinfobot)
 3. Wpisz oba w **Ustawieniach** (`⚙️ Pełne ustawienia` w popupie)
 4. Kliknij **Test Telegram**
@@ -281,14 +297,14 @@ Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Fi
 
 | Strona | Wzór URL | Metoda wyszukiwania |
 |--------|----------|---------------------|
-| IMDb | `imdb.com/title/tt*` | ID providera (imdb) |
+| IMDb | `imdb.com/title/tt*` | Tytuł + weryfikacja ID IMDb |
 | IMDb | `imdb.com/name/nm*` | Nazwa osoby |
-| IMDb (mobile) | `m.imdb.com/title/tt*` | ID providera (imdb) |
+| IMDb (mobile) | `m.imdb.com/title/tt*` | Tytuł + weryfikacja ID IMDb |
 | Filmweb | `filmweb.pl/film/*` | API Filmwebu /info → LD+JSON → fuzzy |
-| Filmweb | `filmweb.pl/serial/*` | Serial, sezony (`/season/*`), odcinki — API Filmwebu /info → partOfSeries / fuzzy |
+| Filmweb | `filmweb.pl/serial/*` | Karta serialu i strony sezonów - API Filmwebu /info → fuzzy |
 | Filmweb | `filmweb.pl/person/*` | Nazwa osoby (oczyszczona) |
-| TMDb | `themoviedb.org/movie/*` | ID providera (tmdb) |
-| TMDb | `themoviedb.org/tv/*` | ID providera (tmdb) |
+| TMDb | `themoviedb.org/movie/*` | Tytuł + weryfikacja ID TMDb |
+| TMDb | `themoviedb.org/tv/*` | Tytuł + weryfikacja ID TMDb |
 | TMDb | `themoviedb.org/person/*` | Nazwa osoby |
 
 ### Struktura plików
@@ -296,7 +312,7 @@ Funkcja stworzona z myślą o domownikach — gdy ktoś znajdzie film na IMDb/Fi
 ```
 jellyfin-checker/
 ├── src/                # Współdzielone pliki źródłowe (takie same dla obu przeglądarek)
-│   ├── background.js   # Service worker / Event page — logika API Jellyfin
+│   ├── background.js   # Service worker / Event page - logika API Jellyfin
 │   ├── content.js      # Ekstrakcja metadanych + badge UI
 │   ├── popup.html      # Konfiguracja (popup)
 │   ├── popup.js        # Obsługa popupu (i18n, zapis, test)
@@ -313,7 +329,7 @@ jellyfin-checker/
 ├── firefox/
 │   └── manifest.json   # Manifest Firefox (MV3, scripts, options_ui)
 ├── userscripts/        # Samodzielne skrypty Tampermonkey (Jellyfin Checker & Jellyfin to Filmweb)
-├── build.sh            # Skrypt budowania — bash build.sh <chrome|firefox>
+├── build.sh            # Skrypt budowania - bash build.sh <chrome|firefox>
 ├── .gitignore
 ├── LICENSE
 └── README.md           # Ta instrukcja
@@ -323,9 +339,19 @@ jellyfin-checker/
 
 | Komponent | Wersja | Uwagi |
 |-----------|--------|-------|
-| Rozszerzenie przeglądarki | 1.0.2 | Chrome Web Store (opublikowane), manifesty `chrome/` + `firefox/`, stopka popupu |
-| `jellyfin-checker.user.js` | 1.0.2 | Samodzielny userscript, wersjonowany wspólnie z rozszerzeniem |
+| Rozszerzenie przeglądarki | 1.0.3 | Lokalna poprawka (wersja w sklepie: 1.0.2), manifesty `chrome/` + `firefox/`, stopka popupu |
+| `jellyfin-checker.user.js` | 1.0.3 | Samodzielny userscript, wersjonowany wspólnie z rozszerzeniem |
 | `jellyfin-to-filmweb.user.js` | 1.4.0 | Osobny mostek w tym samym monorepo, wersjonowany niezależnie |
+
+#### Co nowego w v1.0.3 (lokalnie, przed publikacją)
+
+- Na Filmwebie status pojawia się na głównych kartach filmów, seriali i osób oraz na stronach sezonów (`/serial/.../season/1`). Na stronie sezonu sprawdzana jest dostępność całego serialu. Aktualności, rankingi, dyskusje, strony odcinków i pozostałe podstrony są pomijane.
+
+- Błędy połączenia są odróżniane od braku pozycji; adresy zapasowe nadal są sprawdzane.
+- Puste tytuły nie pasują do dowolnej pozycji, a stare wyniki po zmianie strony nie nadpisują aktualnego statusu.
+- Telegram wysyła zwykły tekst; zapis opcji zachowuje motyw; zamknięcie statusu usuwa też przycisk prośby.
+- `config.json` jest wczytywany przy pierwszej instalacji. Aktualizacje zachowują ustawienia użytkownika.
+- Testy regresji: `node tests/regression.test.cjs` (Node.js 18+).
 
 #### Co nowego w v1.0.2
 
@@ -336,17 +362,19 @@ jellyfin-checker/
 
 ### Bezpieczeństwo i prywatność
 
-- **Klucze API przechowywane w `chrome.storage.local`** — dane zapisane lokalnie, dostępne tylko dla rozszerzenia
-- **Domyślny `config.json` nie zawiera sekretów** — wszystkie dane uwierzytelniające konfigurowane przez UI
-- **Brak zbierania danych** — brak analityki, brak zapytań do stron trzecich (oprócz Twojego Jellyfin i Telegrama jeśli skonfigurowane)
+- **Klucze API przechowywane w `chrome.storage.local`** - dane zapisane lokalnie, dostępne tylko dla rozszerzenia
+- **Domyślny `config.json` nie zawiera sekretów** - wszystkie dane uwierzytelniające konfigurowane przez UI
+- **Brak analityki i telemetrii do autora** - metadane tytułu trafiają do skonfigurowanego Jellyfina. Na Filmwebie odpytywane jest również API metadanych Filmwebu. Telegram otrzymuje tytuł i adres strony po kliknięciu prośby; przycisk testu wysyła wiadomość testową.
+
+Firefox 140+ deklaruje przy instalacji przesyłanie danych uwierzytelniających, treści stron i aktywności przeglądania. Kategorie obejmują klucze wysyłane do skonfigurowanych usług, metadane tytułów i linki źródłowe. Dane nie trafiają do autora. Szczegóły: [dokumentacja zgód Mozilli](https://extensionworkshop.com/documentation/develop/firefox-builtin-data-consent/).
 
 #### Wstępna konfiguracja dla domowników
 
-Możesz edytować `config.json` przed dystrybucją, aby wstępnie wypełnić URL serwera, klucz API i Telegram — przydatne dla domowników. **Uwaga**: to przechowuje sekrety w plain text. Każdy z dostępem do folderu rozszerzenia może je odczytać.
+Możesz edytować `src/config.json` przed zbudowaniem paczki do nowej instalacji, aby wstępnie wypełnić URL serwera, klucz API i Telegram - przydatne dla domowników. Plik jest wczytywany tylko przy pierwszej instalacji; przeładowanie lub aktualizacja zachowuje ustawienia użytkownika. **Uwaga**: to przechowuje sekrety w plain text. Każdy z dostępem do folderu rozszerzenia może je odczytać.
 
 #### Dlaczego rozszerzenie prosi o dostęp do wszystkich stron?
 
-Twój serwer Jellyfin może działać pod dowolnym adresem — localhost, lokalne IP lub domena publiczna. Nie da się tego przewidzieć na etapie budowania, dlatego rozszerzenie prosi o szerokie uprawnienia. Rozszerzenie odczytuje metadane strony (tytuł, rok, ID) w celu dopasowania biblioteki i wstrzykuje badge statusu — nie zbiera danych, łączy się tylko ze skonfigurowanym serwerem Jellyfin i opcjonalnie Telegramem.
+Twój serwer Jellyfin może działać pod dowolnym adresem - localhost, lokalne IP lub domena publiczna. Nie da się tego przewidzieć na etapie budowania, dlatego rozszerzenie prosi o szerokie uprawnienia. Rozszerzenie odczytuje metadane strony (tytuł, rok, ID) w celu dopasowania biblioteki i wstrzykuje badge statusu - wysyła metadane do skonfigurowanego Jellyfina, korzysta z API Filmwebu na jego stronach i opcjonalnie wysyła prośby przez Telegrama. Nie korzysta z usług analitycznych.
 
 ### Współpraca
 

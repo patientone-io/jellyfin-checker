@@ -6,6 +6,7 @@
   "telegram_bot_token": "",
   "telegram_chat_id": "",
   "language": "en",
+  "theme": "system",
   "enable_request_button": false,
   "enable_sound_notifications": false
 }

@@ -3,9 +3,9 @@
 const TRANSLATIONS = {
   pl: {
     subtitle: "Konfiguracja rozszerzenia",
-    headingServer: "Jellyfin Server",
-    headingTelegram: "Telegram — Prośby o dodanie",
-    headingSettings: "Ustawienia",
+    headingServer: "🎬 Jellyfin Server",
+    headingTelegram: "📢 Telegram - Prośby o dodanie",
+    headingSettings: "🌍 Ustawienia",
     urlLabel: "Jellyfin URL #1",
     urlLabelExt: "Jellyfin URL #2",
     keyLabel: "Klucz API",
@@ -20,7 +20,10 @@ const TRANSLATIONS = {
     saveBtn: "Zapisz",
     saveTgBtn: "Zapisz",
     testBtn: "Test",
+    testingBtn: "Testuję...",
     testTgBtn: "Test Telegram",
+    noUrls: "Brak skonfigurowanego URL",
+    noResponse: "Brak odpowiedzi rozszerzenia",
     toggleSound: "Powiadomienia dźwiękowe",
     toggleSoundSub: "Piszcz przy znalezieniu filmu",
     toggleRequest: 'Przycisk "Poproś o dodanie"',
@@ -38,9 +41,9 @@ const TRANSLATIONS = {
   },
   en: {
     subtitle: "Extension settings",
-    headingServer: "Jellyfin Server",
-    headingTelegram: "Telegram — Requests",
-    headingSettings: "Settings",
+    headingServer: "🎬 Jellyfin Server",
+    headingTelegram: "📢 Telegram - Requests",
+    headingSettings: "🌍 Settings",
     urlLabel: "Jellyfin URL #1",
     urlLabelExt: "Jellyfin URL #2",
     keyLabel: "API Key",
@@ -55,7 +58,10 @@ const TRANSLATIONS = {
     saveBtn: "Save",
     saveTgBtn: "Save",
     testBtn: "Test",
+    testingBtn: "Testing...",
     testTgBtn: "Test Telegram",
+    noUrls: "No URLs configured",
+    noResponse: "No response from the extension",
     toggleSound: "Sound notifications",
     toggleSoundSub: "Beep when film is found",
     toggleRequest: '"Request film" button',
@@ -154,16 +160,6 @@ function showStatus(id, message, type) {
   if (type === "success") {
     setTimeout(() => { el.className = "status"; }, 4000);
   }
-}
-
-function statusEl(id) {
-  const el = document.getElementById(id);
-  el.className = "status";
-  return el;
-}
-
-function getLang() {
-  return currentLang;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -270,7 +266,8 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     try {
-      await chrome.storage.local.set({ config });
+      const { config: existing = {} } = await chrome.storage.local.get("config");
+      await chrome.storage.local.set({ config: { ...existing, ...config } });
       showStatus("status-jf", TRANSLATIONS[currentLang].saved, "success");
     } catch (e) {
       showStatus("status-jf", TRANSLATIONS[currentLang].saveErr.replace("{{e}}", e.message), "error");
@@ -293,50 +290,49 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Test Jellyfin
   testBtn.addEventListener("click", async () => {
     testBtn.disabled = true;
-    testBtn.textContent = "Testing...";
-
-    const urls = [urlInput.value.trim()].filter(Boolean);
-    if (urlExtInput && urlExtInput.value.trim()) urls.push(urlExtInput.value.trim());
-    const apiKey = apiKeyInput.value.trim();
-
-    let result;
-    for (const url of urls) {
-      result = await chrome.runtime.sendMessage({
-        action: "test_connection",
-        url,
-        apiKey
-      });
-      if (result?.success) break;
-    }
-
-    testBtn.disabled = false;
-    testBtn.textContent = TRANSLATIONS[currentLang].testBtn;
-
-    if (result && result.success) {
-      showStatus("status-jf", TRANSLATIONS[currentLang].connected(result.serverName, result.version), "success");
-    } else {
-      showStatus("status-jf", TRANSLATIONS[currentLang].connectFail(result?.error || "No URLs configured"), "error");
+    testBtn.textContent = TRANSLATIONS[currentLang].testingBtn;
+    try {
+      const urls = [urlInput.value.trim(), urlExtInput?.value.trim()].filter(Boolean);
+      let result;
+      for (const url of urls) {
+        result = await chrome.runtime.sendMessage({
+          action: "test_connection", url, apiKey: apiKeyInput.value.trim()
+        });
+        if (result?.success) break;
+      }
+      const t = TRANSLATIONS[currentLang];
+      if (result?.success) {
+        showStatus("status-jf", t.connected(result.serverName, result.version), "success");
+      } else {
+        showStatus("status-jf", t.connectFail(result?.error || (urls.length ? t.noResponse : t.noUrls)), "error");
+      }
+    } catch (error) {
+      showStatus("status-jf", TRANSLATIONS[currentLang].connectFail(error.message), "error");
+    } finally {
+      testBtn.disabled = false;
+      testBtn.textContent = TRANSLATIONS[currentLang].testBtn;
     }
   });
 
   // Test Telegram
-  testTgBtn.addEventListener("click", async () => {
+  testTgBtn?.addEventListener("click", async () => {
     testTgBtn.disabled = true;
-    testTgBtn.textContent = "Sending...";
-
-    const result = await chrome.runtime.sendMessage({
-      action: "test_telegram",
-      botToken: telegramTokenInput.value.trim(),
-      chatId: telegramChatIdInput.value.trim()
-    });
-
-    testTgBtn.disabled = false;
-    testTgBtn.textContent = TRANSLATIONS[currentLang].testTgBtn;
-
-    if (result.ok) {
-      showStatus("status-tg", TRANSLATIONS[currentLang].testSent, "success");
-    } else {
-      showStatus("status-tg", TRANSLATIONS[currentLang].testFail(result.error), "error");
+    testTgBtn.textContent = TRANSLATIONS[currentLang].testingBtn;
+    try {
+      const result = await chrome.runtime.sendMessage({
+        action: "test_telegram", botToken: telegramTokenInput.value.trim(), chatId: telegramChatIdInput.value.trim()
+      });
+      const t = TRANSLATIONS[currentLang];
+      if (result?.ok) {
+        showStatus("status-tg", t.testSent, "success");
+      } else {
+        showStatus("status-tg", t.testFail(result?.error || t.noResponse), "error");
+      }
+    } catch (error) {
+      showStatus("status-tg", TRANSLATIONS[currentLang].testFail(error.message), "error");
+    } finally {
+      testTgBtn.disabled = false;
+      testTgBtn.textContent = TRANSLATIONS[currentLang].testTgBtn;
     }
   });
 });

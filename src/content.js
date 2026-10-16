@@ -53,23 +53,20 @@ async function getLang() {
   });
 }
 
-async function badgeText(key, ...args) {
-  const lang = await getLang();
-  const t = i18n[lang] || i18n.en;
-  const val = t[key];
-  return typeof val === "function" ? val(...args) : val;
-}
-
 function waitForElement(selector, maxWait = 5000) {
   return new Promise((resolve) => {
     const el = document.querySelector(selector);
     if (el) return resolve(el);
-    const start = Date.now();
+    const finish = (result) => {
+      clearTimeout(timer);
+      observer.disconnect();
+      resolve(result);
+    };
     const observer = new MutationObserver(() => {
       const el = document.querySelector(selector);
-      if (el) { observer.disconnect(); resolve(el); return; }
-      if (Date.now() - start > maxWait) { observer.disconnect(); resolve(null); }
+      if (el) finish(el);
     });
+    const timer = setTimeout(() => finish(null), maxWait);
     observer.observe(document.body, { childList: true, subtree: true });
   });
 }
@@ -106,14 +103,14 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
   closeBtn.textContent = "\u00D7";
   closeBtn.title = (i18n[lang] || i18n.en).closeTitle;
   closeBtn.style.cssText = "background:rgba(0,0,0,.15);color:rgba(255,255,255,.7);border:none;font-size:20px;padding:0 10px;cursor:pointer;line-height:1;flex-shrink:0;position:relative;z-index:1;";
-  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); container.remove(); });
+  closeBtn.addEventListener("click", (e) => { e.stopPropagation(); wrapper.remove(); });
   closeBtn.addEventListener("mouseenter", () => { closeBtn.style.color = "#fff"; });
   closeBtn.addEventListener("mouseleave", () => { closeBtn.style.color = "rgba(255,255,255,.7)"; });
   container.appendChild(closeBtn);
 
   // Whole badge clickable
   if (url && url !== "#") {
-    container.addEventListener("click", (e) => { if (e.target === closeBtn) return; window.open(url, "_blank"); });
+    container.addEventListener("click", (e) => { if (e.target === closeBtn) return; window.open(url, "_blank", "noopener"); });
     container.addEventListener("mouseenter", () => { container.style.filter = "brightness(1.15)"; });
     container.addEventListener("mouseleave", () => { container.style.filter = "none"; });
   }
@@ -176,6 +173,13 @@ function removeExistingBadge() {
 /* ─── Site detection ─── */
 function detectSite() {
   const url = window.location.href;
+  const parsedURL = new URL(url);
+  if (parsedURL.hostname === "filmweb.pl" || parsedURL.hostname === "www.filmweb.pl") {
+    // Main title/person cards and series seasons; other subpages are excluded.
+    const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/season\/\d+)?\/?$/);
+    if (!match || (match[3] && match[1] !== "serial")) return null;
+    return { name: match[1] === "person" ? "filmweb-person" : "filmweb", id: match[2] };
+  }
 
   // Jellyfin — supports both old (#!/) and new (/#/) routing
   if (url.includes("/web/") && (url.includes("#/details") || url.includes("#!/details"))) {
@@ -189,18 +193,6 @@ function detectSite() {
   if (url.includes("imdb.com/name/")) {
     const match = url.match(/name\/(nm[\d]+)/);
     return match ? { name: "imdb-person", id: match[1] } : { name: "imdb-person" };
-  }
-  const filmwebMediaMatch = url.match(/filmweb\.pl\/(film|serial)\/([^/?#]+)/);
-  if (filmwebMediaMatch) {
-    const slug = filmwebMediaMatch[2];
-    const idMatch = slug.match(/-(\d+)$/);
-    return { name: "filmweb", id: idMatch ? idMatch[1] : null };
-  }
-  const filmwebPersonMatch = url.match(/filmweb\.pl\/person\/([^/?#]+)/);
-  if (filmwebPersonMatch) {
-    const slug = filmwebPersonMatch[1];
-    const idMatch = slug.match(/-(\d+)$/);
-    return { name: "filmweb-person", id: idMatch ? idMatch[1] : null };
   }
   if (url.includes("themoviedb.org/person/")) {
     const match = url.match(/\/(\d+)/);
@@ -537,57 +529,65 @@ function extractTMDBPerson(personId) {
 }
 
 /* ─── Main Execution & SPA Handler ─── */
+let checkGeneration = 0;
 async function runCheck() {
+  const generation = ++checkGeneration;
+  const sourceURL = window.location.href;
+  const isCurrent = () => generation === checkGeneration && sourceURL === window.location.href;
+  const render = async (key, url, gradient, requestable = false, metadata = null, ...args) => {
+    const lang = await getLang();
+    if (!isCurrent()) return;
+    const value = (i18n[lang] || i18n.en)[key];
+    showBadge(typeof value === "function" ? value(...args) : value, url, gradient, requestable, metadata, lang);
+  };
   const site = detectSite();
-  if (!site) return;
-  if (site.name === "jellyfin") return;
-
-  if (!site.name.startsWith("tmdb")) {
-    await waitForElement("h1", 3500);
-  }
-
-  let metadata = null;
-  switch (site.name) {
-    case "imdb": metadata = extractIMDB(site.id); break;
-    case "imdb-person": metadata = extractIMDBPerson(site.id); break;
-    case "filmweb": metadata = await extractFilmweb(site.id); break;
-    case "filmweb-person": metadata = extractFilmwebPerson(); break;
-    case "tmdb": metadata = extractTMDB(site.id, site.type); break;
-    case "tmdb-person": metadata = extractTMDBPerson(site.id); break;
-  }
-
-  console.log("[JK] Metadata extracted:", metadata);
-  if (!metadata?.title) {
-    showBadge(await badgeText("noTitle"), null, "linear-gradient(135deg, #b45309, #78350f)");
+  if (!site || site.name === "jellyfin") {
+    removeExistingBadge();
     return;
   }
 
-  showBadge(await badgeText("checking"), null, "linear-gradient(135deg, #4338ca, #1e40af)");
-
-  chrome.runtime.sendMessage({ action: "search_jellyfin", params: metadata }, async (response) => {
-    const lang = await getLang();
-    console.log("[JK] Jellyfin response:", response);
-    if (!response) { showBadge(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)"); return; }
-    if (response.configMissing) { showBadge(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)"); return; }
-    if (response.error) { showBadge(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)"); return; }
-
-    const cfg = await new Promise(r => chrome.storage.local.get("config", r));
-    const config = cfg.config || {};
-
-    if (response.found) {
-      if (response.count !== undefined) {
-        showBadge(await badgeText("foundMany", response.count), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)");
-      } else {
-        showBadge(await badgeText("found"), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)");
-      }
-      if (config.enable_sound_notifications) {
-        playBeep();
-      }
-    } else {
-      const enableRequest = config.enable_request_button ?? false;
-      showBadge(await badgeText("notFound"), null, "linear-gradient(135deg, #1a2f42, #991b1b)", enableRequest, metadata, lang);
+  try {
+    if (!site.name.startsWith("tmdb")) await waitForElement("h1", 3500);
+    if (!isCurrent()) return;
+    let metadata = null;
+    switch (site.name) {
+      case "imdb": metadata = extractIMDB(site.id); break;
+      case "imdb-person": metadata = extractIMDBPerson(site.id); break;
+      case "filmweb": metadata = await extractFilmweb(site.id); break;
+      case "filmweb-person": metadata = extractFilmwebPerson(); break;
+      case "tmdb": metadata = extractTMDB(site.id, site.type); break;
+      case "tmdb-person": metadata = extractTMDBPerson(site.id); break;
     }
-  });
+    if (!isCurrent()) return;
+    if (!metadata?.title) {
+      await render("noTitle", null, "linear-gradient(135deg, #b45309, #78350f)");
+      return;
+    }
+    await render("checking", null, "linear-gradient(135deg, #4338ca, #1e40af)");
+    if (!isCurrent()) return;
+    const response = await chrome.runtime.sendMessage({ action: "search_jellyfin", params: metadata });
+    if (!isCurrent()) return;
+    if (response?.configMissing) {
+      await render("needConfig", null, "linear-gradient(135deg, #b45309, #78350f)");
+      return;
+    }
+    if (!response || response.error) {
+      await render("error", null, "linear-gradient(135deg, #4b5563, #1f2937)");
+      return;
+    }
+    const { config = {} } = await chrome.storage.local.get("config");
+    if (!isCurrent()) return;
+    if (response.found) {
+      await render(response.count !== undefined ? "foundMany" : "found", response.jellyfinURL,
+        "linear-gradient(135deg, #1a2f42, #15803d)", false, metadata, response.count);
+      if (isCurrent() && config.enable_sound_notifications) playBeep();
+    } else {
+      await render("notFound", null, "linear-gradient(135deg, #1a2f42, #991b1b)", config.enable_request_button, metadata);
+    }
+  } catch (error) {
+    console.warn("[JK] Check failed:", error.message);
+    await render("error", null, "linear-gradient(135deg, #4b5563, #1f2937)");
+  }
 }
 
 // SPA Navigation listener
