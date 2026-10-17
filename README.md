@@ -6,6 +6,9 @@
 >
 > Sprawdź, co masz już w Jellyfinie, podczas przeglądania Filmwebu, IMDb i TMDb.
 
+![version](https://img.shields.io/badge/version-1.0.3-blue)
+[![Chrome Web Store](https://img.shields.io/chrome-web-store/v/llbfpbeiiidailfdcbdeilmonlikdoef?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
+
 ## 🇬🇧 English
 
 Jellyfin Checker adds a library status badge to movie, series and person pages. If a title is available, click the badge to open it in Jellyfin. On a person page, it shows matching items from your library.
