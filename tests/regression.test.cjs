@@ -19,6 +19,8 @@ function harness(file, initial = config) {
   let stored = structuredClone(initial);
   const elements = new Map();
   const listeners = new Map();
+  const storageListeners = [];
+  const gmValues = new Map();
   class Element {
     constructor() {
       this.children = [];
@@ -57,19 +59,31 @@ function harness(file, initial = config) {
     history: {},
     MutationObserver: class { constructor(fn) { this.fn = fn; ctx.observer = this; } observe() {} disconnect() { this.disconnected = true; } },
     chrome: {
-      runtime: { onInstalled: { addListener() {} }, onMessage: { addListener() {} }, getURL: path => `extension://${path}`, sendMessage: async () => undefined },
-      storage: { local: {
+      runtime: { onInstalled: { addListener() {} }, onMessage: { addListener(fn) { ctx.messageHandler = fn; } }, getURL: path => `extension://${path}`, sendMessage: async () => undefined },
+      storage: { onChanged: { addListener(fn) { storageListeners.push(fn); } }, local: {
         get(key, cb) { const result = { config: structuredClone(stored) }; if (cb) cb(result); else return Promise.resolve(result); },
-        set(value, cb) { stored = structuredClone(value.config); if (cb) cb(); return Promise.resolve(); }
+        set(value, cb) {
+          const oldValue = stored;
+          stored = structuredClone(value.config);
+          if (JSON.stringify(oldValue) !== JSON.stringify(stored)) {
+            for (const listener of storageListeners) listener({ config: { oldValue, newValue: stored } }, 'local');
+          }
+          if (cb) cb(); return Promise.resolve();
+        }
       } }
     },
-    GM_getValue: (key, fallback) => key === 'config' ? structuredClone(stored) : fallback,
-    GM_setValue() {}, GM_registerMenuCommand() {}
+    GM_getValue: (key, fallback) => key === 'config' ? structuredClone(stored) : (gmValues.get(key) ?? fallback),
+    GM_setValue(key, value) { if (key === 'config') stored = structuredClone(value); else gmValues.set(key, structuredClone(value)); }, GM_registerMenuCommand() {}
   };
   vm.createContext(ctx);
+  if (['src/popup.js', 'src/options.js'].includes(file)) {
+    vm.runInContext(source('src/background.js'), ctx);
+    ctx.chrome.runtime.sendMessage = message => new Promise(resolve => ctx.messageHandler(message, { url: 'extension://settings.html' }, resolve));
+    vm.runInContext(source('src/settings.js'), ctx);
+  }
   let code = source(file);
   if (file.startsWith('userscripts/')) {
-    code = code.replace('  // Initial load\n  run();', '  globalThis.api = { handleSearch, waitForElement, requestAdd, showBadge, run, detectSite, extractFilmweb };');
+    code = code.replace('  // Initial load\n  run();', '  globalThis.api = { handleSearch, waitForElement, requestAdd, showBadge, run, detectSite, extractFilmweb, extractFilmwebPerson, extractIMDB, extractIMDBPerson, extractTMDB, extractTMDBPerson, getConfig, saveConfig, getCachedResult, setCachedResult, titleSimilarMatch, testConnection };');
   }
   vm.runInContext(code, ctx, { filename: file });
   return { ctx, elements, listeners, get stored() { return stored; } };
@@ -84,7 +98,7 @@ test('empty original title cannot accept an unrelated movie; valid title and pro
   assert.equal(await ctx.searchByTitle('https://local.invalid', {}, 'Matrix', 1999), null);
   ctx.fetch = async () => response([{ Name: 'Different title', ProviderIds: { Imdb: 'tt0133093' } }]);
   assert.equal((await ctx.searchByTitle('https://local.invalid', {}, 'Matrix', 1999, 'tt0133093')).Name, 'Different title');
-  assert.equal(ctx.titleSimilarMatch('thematrix', 'matrix'), true);
+  assert.equal(ctx.titleSimilarMatch('the matrix', 'matrix'), true);
   assert.equal(ctx.titleSimilarMatch('matrx', 'matrix'), true);
 });
 
@@ -138,10 +152,13 @@ test('empty address list requests configuration without making a network request
 
 test('connection test never uses public reachability as proof that credentials work', async () => {
   const { ctx } = background();
-  const urls = [];
-  ctx.fetch = async url => { urls.push(url); return response([], 401); };
+  const calls = [];
+  ctx.fetch = async (url, opts) => { calls.push({ url, headers: opts?.headers }); return response([], 401); };
   assert.equal((await ctx.testConnection('https://local.invalid', 'wrong')).success, false);
-  assert.deepEqual(urls, ['https://local.invalid/System/Info']);
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url, 'https://local.invalid/System/Info');
+  assert.match(calls[0].headers?.Authorization || '', /MediaBrowser .*Token="wrong"/);
+  assert.equal(calls[0].headers?.['X-Emby-Token'], 'wrong');
 });
 
 test('bundled defaults load on installation, existing settings survive updates and legacy URLs migrate', async () => {
@@ -311,7 +328,7 @@ for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
 }
 
 for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
-  test(`${file}: Filmweb badge allows main cards and series seasons while excluding unrelated subpages`, async () => {
+  test(`${file}: Filmweb badge allows main cards and series seasons/episodes while excluding unrelated subpages`, async () => {
     const { ctx } = harness(file);
     const detect = ctx.api?.detectSite || ctx.detectSite;
     for (const host of ['filmweb.pl', 'www.filmweb.pl']) {
@@ -320,6 +337,8 @@ for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
         ['/serial/Dark-2017-771383/', 'filmweb', '771383'],
         ['/serial/Dark-2017-771383/season/1', 'filmweb', '771383'],
         ['/serial/Dark-2017-771383/season/2/?ref=series#episodes', 'filmweb', '771383'],
+        ['/serial/We+Can+Be+Heroes-2005-556943/episode/1/1', 'filmweb', '556943'],
+        ['/serial/Dark-2017-771383/episode/1', 'filmweb', '771383'],
         ['/person/Keanu+Reeves-87?ref=search#bio', 'filmweb-person', '87']
       ]) {
         ctx.window.location.href = `https://${host}${path}`;
@@ -333,8 +352,9 @@ for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
     for (const path of [
       '/', '/news', '/news/Matrix-123456', '/ranking/film', '/search', '/film',
       '/film/Matrix', '/film/Matrix-1999-628/discussion', '/film/Matrix-1999-628/cast',
-      '/serial/Dark-2017-771383/episode/1', '/serial/Dark-2017-771383/season/1/discussion',
+      '/serial/Dark-2017-771383/episode/ranking', '/serial/Dark-2017-771383/season/1/discussion',
       '/serial/Dark-2017-771383/season/invalid', '/film/Matrix-1999-628/season/1',
+      '/film/Matrix-1999-628/episode/1/1',
       '/person/Keanu+Reeves-87/season/1',
       '/person/Keanu+Reeves-87/filmography',
       '/news?redirect=imdb.com/title/tt0133093', '/search?url=https://filmweb.pl/film/Matrix-1999-628'
@@ -348,25 +368,241 @@ for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
 }
 
 for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
-  test(`${file}: a season uses the parent series ID, title and premiere year`, async () => {
+  test(`${file}: a season or episode uses the parent series ID, title and premiere year`, async () => {
     const { ctx } = harness(file);
-    ctx.window.location.href = 'https://www.filmweb.pl/serial/Dark-2017-771383/season/3';
-    ctx.window.location.pathname = new URL(ctx.window.location.href).pathname;
+    for (const href of [
+      'https://www.filmweb.pl/serial/Dark-2017-771383/season/3',
+      'https://www.filmweb.pl/serial/Dark-2017-771383/episode/3/1'
+    ]) {
+      ctx.window.location.href = href;
+      ctx.window.location.pathname = new URL(ctx.window.location.href).pathname;
+      const urls = [];
+      ctx.fetch = async url => {
+        urls.push(url);
+        return { ok: true, json: async () => ({ title: 'Dark', originalTitle: 'Dark', year: 2017 }) };
+      };
+      ctx.GM_xmlhttpRequest = opts => {
+        urls.push(opts.url);
+        opts.onload({ status: 200, responseText: JSON.stringify({ title: 'Dark', originalTitle: 'Dark', year: 2017 }) });
+      };
+      const site = (ctx.api?.detectSite || ctx.detectSite)();
+      const result = await (ctx.api?.extractFilmweb || ctx.extractFilmweb)(site.id);
+      assert.deepEqual(urls, ['https://www.filmweb.pl/api/v1/serial/771383/info']);
+      assert.equal(result.title, 'Dark');
+      assert.equal(result.year, 2017);
+      assert.equal(result.type, 'tv');
+      assert.equal(result.filmwebId, '771383');
+    }
+  });
+}
+
+for (const file of ['src/background.js', 'userscripts/jellyfin-checker.user.js']) {
+  test(`${file}: media type and conflicting provider IDs reject false positives`, async () => {
+    const { ctx } = harness(file);
     const urls = [];
-    ctx.fetch = async url => {
-      urls.push(url);
-      return { ok: true, json: async () => ({ title: 'Dark', originalTitle: 'Dark', year: 2017 }) };
-    };
-    ctx.GM_xmlhttpRequest = opts => {
-      urls.push(opts.url);
-      opts.onload({ status: 200, responseText: JSON.stringify({ title: 'Dark', originalTitle: 'Dark', year: 2017 }) });
-    };
-    const site = (ctx.api?.detectSite || ctx.detectSite)();
-    const result = await (ctx.api?.extractFilmweb || ctx.extractFilmweb)(site.id);
-    assert.deepEqual(urls, ['https://www.filmweb.pl/api/v1/serial/771383/info']);
-    assert.equal(result.title, 'Dark');
-    assert.equal(result.year, 2017);
-    assert.equal(result.type, 'tv');
-    assert.equal(result.filmwebId, '771383');
+    let items;
+    ctx.fetch = async url => { urls.push(url); return response(items); };
+    ctx.GM_xmlhttpRequest = opts => { urls.push(opts.url); opts.onload({ status: 200, responseText: JSON.stringify({ Items: items }) }); };
+    const search = params => ctx.api ? ctx.api.handleSearch(params, config) : ctx.handleSearch(params);
+    const params = { ...metadata, imdbId: 'tt0133093', tmdbId: '603' };
+    for (const item of [
+      { ...movie, Type: 'Series', ProviderIds: { Imdb: params.imdbId, Tmdb: '603' } },
+      { ...movie, Type: 'Movie', ProviderIds: { Imdb: 'tt99999' } },
+      { ...movie, Type: 'Movie', ProviderIds: { Imdb: params.imdbId, Tmdb: '999' } }
+    ]) {
+      items = [item];
+      assert.equal((await search(params)).found, false);
+    }
+    items = [{ ...movie, Type: 'Movie' }];
+    assert.equal((await search(params)).found, true, 'missing IDs still allow title fallback');
+    assert.ok(urls.every(url => new URL(url).searchParams.get('IncludeItemTypes') === 'Movie'));
+    urls.length = 0;
+    items = [{ ...movie, Type: 'Series' }];
+    assert.equal((await search({ ...metadata, type: 'tv' })).found, true);
+    assert.equal(new URL(urls[0]).searchParams.get('IncludeItemTypes'), 'Series');
+  });
+}
+
+for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
+  test(`${file}: IMDb episodes and seasons use only parent series metadata`, async () => {
+    const { ctx } = harness(file);
+    const extract = ctx.api?.extractIMDB || ctx.extractIMDB;
+    for (const type of ['TVEpisode', 'TVSeason']) {
+      const data = { '@type': type, name: 'Episode title', datePublished: '2024-01-01', partOfSeries: { name: 'Example show' } };
+      ctx.document.querySelectorAll = () => [{ textContent: JSON.stringify(data) }];
+      ctx.document.querySelector = () => ({ content: 'Episode title (2024)' });
+      const meta = extract('tt99999');
+      assert.deepEqual(json(meta), { title: 'Example show', year: null, imdbId: null, type: 'tv' });
+      const bg = background();
+      bg.ctx.fetch = async () => response([{ Id: 'series', Type: 'Series', Name: 'Example show', ProductionYear: 2015, ProviderIds: { Imdb: 'tt11111' } }]);
+      assert.equal((await bg.ctx.handleSearch(meta)).found, true);
+      data.partOfSeries.startDate = '2015-01-01';
+      data.partOfSeries.url = 'https://www.imdb.com/title/tt11111/';
+      assert.equal(extract('tt99999').imdbId, 'tt11111');
+      assert.equal(extract('tt99999').year, 2015);
+      delete data.partOfSeries;
+      assert.equal(extract('tt99999'), null, 'do not search by episode title without a parent');
+
+      // Fallback to DOM series link when ld+json omits partOfSeries
+      ctx.document.querySelector = selector => selector.includes('series-link')
+        ? { textContent: 'We Can Be Heroes', href: '/title/tt0425674/?ref_=tt_ov_inf' }
+        : { content: 'Episode #1.1 (2005)' };
+      assert.deepEqual(json(extract('tt0774467')), { title: 'We Can Be Heroes', year: null, imdbId: 'tt0425674', type: 'tv' });
+    }
+    // IMDb /title/tt.../episodes/ subpage
+    ctx.window.location.href = 'https://www.imdb.com/title/tt0425674/episodes/?ref_=tt_epspo_eps';
+    ctx.window.location.pathname = '/title/tt0425674/episodes/';
+    const detect = ctx.api?.detectSite || ctx.detectSite;
+    assert.deepEqual(json(detect()), { name: 'imdb', id: 'tt0425674' });
+    ctx.document.querySelector = selector => selector === 'meta[property="og:title"]'
+      ? { content: 'We Can Be Heroes (TV Series 2005) - Episode list - IMDb' }
+      : (selector.includes('h1') ? { textContent: 'Episode list' } : null);
+    assert.deepEqual(json(extract('tt0425674')), { imdbId: 'tt0425674', title: 'We Can Be Heroes', year: 2005, type: 'tv' });
+  });
+}
+
+for (const file of ['src/popup.js', 'src/options.js']) {
+  test(`${file}: autosave changes only the edited field and reflects external updates`, async () => {
+    const h = harness(file);
+    await h.listeners.get('DOMContentLoaded')();
+    // Keep a stale form to verify field-level writes independently of synchronization.
+    const input = h.elements.get('jellyfin-api-key');
+    await h.ctx.chrome.storage.local.set({ config: { ...config, jellyfin_api_key: 'new-key' } });
+    assert.equal(input.value, 'new-key');
+    input.value = 'stale-key';
+    h.elements.get('telegram-chat-id').value = '123';
+    await h.elements.get('telegram-chat-id').events.input();
+    assert.equal(h.stored.jellyfin_api_key, 'new-key');
+    assert.equal(h.stored.telegram_chat_id, '123');
+    h.elements.get('jellyfin-url').value = '';
+    await h.elements.get('jellyfin-url').events.input();
+    assert.deepEqual(h.stored.jellyfin_urls, ['', config.jellyfin_urls[1]]);
+    h.elements.get('jellyfin-url-external').value = 'https://changed.invalid';
+    await h.elements.get('jellyfin-url-external').events.change();
+    assert.deepEqual(h.stored.jellyfin_urls, ['', 'https://changed.invalid']);
+  });
+}
+
+test('concurrent configuration patches and URL edits retain all values; queue recovers after failure', async () => {
+  const h = background({ ...config, jellyfin_token: 'old' });
+  await Promise.all([
+    h.ctx.updateConfig({ language: 'pl' }), h.ctx.updateConfig({ theme: 'dark' }),
+    h.ctx.updateConfig({}, { index: 0, value: 'https://new.invalid' }),
+    h.ctx.updateConfig({}, { index: 1, value: 'https://backup.invalid' }),
+    h.ctx.updateConfig({ jellyfin_api_key: 'new' })
+  ]);
+  assert.equal(h.stored.language, 'pl'); assert.equal(h.stored.theme, 'dark');
+  assert.deepEqual(h.stored.jellyfin_urls, ['https://new.invalid', 'https://backup.invalid']);
+  assert.equal(h.stored.jellyfin_token, undefined);
+  await assert.rejects(h.ctx.updateConfig({ language: [] }));
+  await h.ctx.updateConfig({ language: 'en' }); assert.equal(h.stored.language, 'en');
+});
+
+for (const file of ['src/background.js', 'userscripts/jellyfin-checker.user.js']) {
+  test(`${file}: title fallback rejects sequels and short unrelated titles, preserves Unicode and matches colon subtitles`, async () => {
+    const { ctx } = harness(file);
+    const match = ctx.api?.titleSimilarMatch || ctx.titleSimilarMatch;
+    for (const [a,b] of [
+      ['Matrix Reloaded','Matrix'],
+      ['Rocky 2','Rocky 3'],
+      ['It','Up'],
+      ['Rocky IV','Rocky V'],
+      ['Diuna: Część druga', 'Diuna'],
+      ['Dune: Part Two', 'Dune'],
+      ['Love is Blind: Polska', 'Love is Blind: Holandia']
+    ]) {
+      assert.equal(match(a,b), false, `${a} / ${b}`);
+    }
+    assert.equal(match('Żółć', 'Zolc'), true);
+    assert.equal(match('千と千尋の神隠し', '千と千尋の神隠し'), true);
+    assert.equal(match('We Can Be Heroes: Finding The Australian of the Year', 'We Can Be Heroes'), true);
+    assert.equal(match('We Can Be Heroes', 'We Can Be Heroes: Finding The Australian of the Year'), true);
+    assert.equal(match('Cube 2: Hypercube', 'Cube 2'), true);
+
+    const items = [{
+      Id: '9f9d98b41c15a0f900c609df5114840b',
+      Name: 'We Can Be Heroes: Finding The Australian of the Year',
+      OriginalTitle: 'We Can Be Heroes: Finding The Australian of the Year',
+      ProductionYear: 2005,
+      Type: 'Series'
+    }];
+    ctx.fetch = async () => response(items);
+    ctx.GM_xmlhttpRequest = opts => opts.onload({ status: 200, responseText: JSON.stringify({ Items: items }) });
+    const search = params => ctx.api ? ctx.api.handleSearch(params, config) : ctx.handleSearch(params);
+    const res = await search({ title: 'We Can Be Heroes', year: 2005, type: 'tv' });
+    assert.equal(res.found, true);
+  });
+}
+
+test('standalone cache separates movie/series/person IDs and title variants', () => {
+  const { ctx } = harness('userscripts/jellyfin-checker.user.js');
+  ctx.api.setCachedResult({ title: 'Same', type: 'movie', tmdbId: '123' }, { found: true });
+  assert.equal(ctx.api.getCachedResult({ title: 'Same', type: 'tv', tmdbId: '123' }), null);
+  assert.equal(ctx.api.getCachedResult({ title: 'Same', type: 'person', tmdbId: '123' }), null);
+  ctx.api.setCachedResult({ title: 'Local', originalTitle: 'First', type: 'movie' }, { found: true });
+  assert.equal(ctx.api.getCachedResult({ title: 'Local', originalTitle: 'Second', type: 'movie' }), null);
+});
+
+test('standalone configuration permits an empty URL list and connection test returns server name', async () => {
+  const { ctx } = harness('userscripts/jellyfin-checker.user.js', { ...config, jellyfin_urls: [] });
+  assert.equal(ctx.api.getConfig().jellyfin_urls.length, 0);
+  ctx.GM_xmlhttpRequest = opts => opts.onload({ status: 200, responseText: '{"ServerName":"Home","Version":"10"}' });
+  const result = await ctx.api.testConnection('https://local.invalid', 'key');
+  assert.equal(result.serverName, 'Home');
+});
+
+for (const file of ['src/content.js', 'userscripts/jellyfin-checker.user.js']) {
+  test(`${file}: metadata fallback parses full IMDb title and TMDb title/year`, () => {
+    const { ctx } = harness(file);
+    ctx.document.getElementById = () => null;
+    ctx.document.querySelector = selector => selector === 'meta[property="og:title"]' ? { content: 'The Matrix (1999)' } : null;
+    const imdb = (ctx.api?.extractIMDB || ctx.extractIMDB)('tt0133093');
+    assert.equal(imdb.title, 'The Matrix'); assert.equal(imdb.year, 1999);
+    const tmdb = (ctx.api?.extractTMDB || ctx.extractTMDB)('603', 'movie');
+    assert.equal(tmdb.title, 'The Matrix'); assert.equal(tmdb.year, 1999);
+
+    // TMDb TV season and episode subpages extract parent series title and TMDb ID
+    const detect = ctx.api?.detectSite || ctx.detectSite;
+    for (const url of [
+      'https://www.themoviedb.org/tv/13676-we-can-be-heroes-finding-the-australian-of-the-year/season/1',
+      'https://www.themoviedb.org/tv/13676-we-can-be-heroes-finding-the-australian-of-the-year/season/1/episode/1',
+      'https://www.themoviedb.org/tv/13676-we-can-be-heroes-finding-the-australian-of-the-year/seasons'
+    ]) {
+      ctx.window.location.href = url;
+      ctx.window.location.pathname = new URL(url).pathname;
+      assert.deepEqual(json(detect()), { name: 'tmdb', type: 'tv', id: '13676' });
+      ctx.document.title = 'We Can Be Heroes: Finding The Australian of the Year: Sezon 1 (2005) — The Movie Database (TMDB)';
+      ctx.document.querySelector = selector => selector === 'meta[property="og:title"]' ? { content: 'Sezon 1' } : null;
+      assert.deepEqual(json((ctx.api?.extractTMDB || ctx.extractTMDB)('13676', 'tv')), {
+        tmdbId: '13676',
+        title: 'We Can Be Heroes: Finding The Australian of the Year',
+        year: null,
+        type: 'tv'
+      });
+    }
+  });
+
+  test(`${file}: person extractors strip Roman suffixes and TMDb branding across ld+json and DOM fallbacks`, () => {
+    const { ctx } = harness(file);
+    ctx.document.getElementById = () => null;
+    ctx.document.querySelectorAll = () => [{ textContent: JSON.stringify({ '@type': 'Person', name: 'Keanu Reeves (I)', sameAs: 'https://www.imdb.com/name/nm0000206/' }) }];
+    assert.deepEqual(json((ctx.api?.extractIMDBPerson || ctx.extractIMDBPerson)('nm0000206')), { imdbId: 'nm0000206', title: 'Keanu Reeves', type: 'person' });
+    assert.deepEqual(json((ctx.api?.extractFilmwebPerson || ctx.extractFilmwebPerson)()), { title: 'Keanu Reeves', imdbId: 'nm0000206', type: 'person' });
+
+    ctx.document.querySelectorAll = () => [];
+    ctx.document.querySelector = selector => selector === 'meta[property="og:title"]'
+      ? { content: 'Keanu Reeves — The Movie Database (TMDB)' }
+      : { textContent: 'Keanu Reeves II' };
+    assert.deepEqual(json((ctx.api?.extractIMDBPerson || ctx.extractIMDBPerson)('nm0000206')), { imdbId: 'nm0000206', title: 'Keanu Reeves', type: 'person' });
+    assert.deepEqual(json((ctx.api?.extractFilmwebPerson || ctx.extractFilmwebPerson)()), { title: 'Keanu Reeves', imdbId: null, type: 'person' });
+    assert.deepEqual(json((ctx.api?.extractTMDBPerson || ctx.extractTMDBPerson)('6384')), { tmdbId: '6384', title: 'Keanu Reeves', type: 'person' });
+  });
+
+  test(`${file}: unrelated site paths and query strings cannot trigger title detection`, () => {
+    const { ctx } = harness(file);
+    for (const url of ['https://www.imdb.com/find/?q=imdb.com/title/tt123', 'https://www.themoviedb.org/search?query=themoviedb.org/movie/123']) {
+      ctx.window.location.href = url;
+      assert.equal((ctx.api?.detectSite || ctx.detectSite)(), null);
+    }
   });
 }

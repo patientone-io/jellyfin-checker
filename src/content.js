@@ -15,7 +15,7 @@ const i18n = {
     notFound: "Brak na Jellyfin",
     error: "Błąd połączenia",
     needConfig: "Skonfiguruj Jellyfin",
-    reqText: "Nie znaleziono — chcesz poprosić o dodanie?",
+    reqText: "Nie znaleziono - chcesz poprosić o dodanie?",
     reqBtn: "Poproś o film ▶",
     reqSending: "🔄 Wysyłam...",
     reqSent: "✅ Wysłano!",
@@ -31,7 +31,7 @@ const i18n = {
     notFound: "Not on Jellyfin",
     error: "Connection error",
     needConfig: "Configure Jellyfin",
-    reqText: "Not found — want to request it?",
+    reqText: "Not found - want to request it?",
     reqBtn: "Request film ▶",
     reqSending: "🔄 Sending...",
     reqSent: "✅ Sent!",
@@ -73,6 +73,7 @@ function waitForElement(selector, maxWait = 5000) {
 
 function showBadge(text, url, gradient, requestable = null, metadata = null, lang = "en") {
   removeExistingBadge();
+  const sourceURL = window.location.href;
   const wrapper = document.createElement("div");
   wrapper.id = "jellyfin-keeper-wrapper";
   wrapper.style.cssText = "position:fixed;top:20px;right:20px;z-index:2147483647;display:flex;flex-direction:column;align-items:flex-end;gap:6px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;";
@@ -119,20 +120,21 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
   wrapper.appendChild(container);
 
   // ─── Request button (when film not on Jellyfin)
-  if (requestable && metadata?.title) {
+  if (requestable && metadata?.title && ["movie", "tv"].includes(metadata.type)) {
     const t = i18n[lang] || i18n.en;
     const reqBtn = document.createElement("button");
     reqBtn.textContent = t.reqBtn;
     reqBtn.style.cssText = "background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s;font-family:inherit;";
     reqBtn.addEventListener("click", (e) => {
       e.stopPropagation();
+      reqBtn.disabled = true;
       reqBtn.style.pointerEvents = "none";
       reqBtn.style.opacity = "0.6";
       reqBtn.textContent = t.reqSending;
       chrome.runtime.sendMessage({
         action: "request_add",
         meta: metadata,
-        sourceURL: window.location.href
+        sourceURL
       }, (resp) => {
         if (resp && resp.ok) {
           reqBtn.style.background = "#064e3b";
@@ -142,6 +144,7 @@ function showBadge(text, url, gradient, requestable = null, metadata = null, lan
           reqBtn.style.cursor = "default";
           setTimeout(() => reqBtn.remove(), 5000);
         } else {
+          reqBtn.disabled = false;
           const msg = resp && resp.error ? resp.error : t.reqErrFallback;
           reqBtn.style.background = "#7f1d1d";
           reqBtn.style.borderColor = "#991b1b";
@@ -175,32 +178,22 @@ function detectSite() {
   const url = window.location.href;
   const parsedURL = new URL(url);
   if (parsedURL.hostname === "filmweb.pl" || parsedURL.hostname === "www.filmweb.pl") {
-    // Main title/person cards and series seasons; other subpages are excluded.
-    const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/season\/\d+)?\/?$/);
+    // Main title/person cards and series seasons/episodes; other subpages are excluded.
+    const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/(?:season\/\d+|episode\/\d+(?:\/\d+)?))?\/?$/);
     if (!match || (match[3] && match[1] !== "serial")) return null;
     return { name: match[1] === "person" ? "filmweb-person" : "filmweb", id: match[2] };
   }
 
-  // Jellyfin — supports both old (#!/) and new (/#/) routing
-  if (url.includes("/web/") && (url.includes("#/details") || url.includes("#!/details"))) {
-    return { name: "jellyfin" };
+  if (['imdb.com', 'www.imdb.com', 'm.imdb.com'].includes(parsedURL.hostname)) {
+    const match = parsedURL.pathname.match(/^\/(title|name)\/((?:tt|nm)\d+)(\/episodes)?\/?$/);
+    if (!match || (match[1] === 'title' ? !match[2].startsWith('tt') : (!match[2].startsWith('nm') || match[3]))) return null;
+    return { name: match[1] === 'title' ? 'imdb' : 'imdb-person', id: match[2] };
   }
-
-  if (url.includes("imdb.com/title/")) {
-    const match = url.match(/title\/(tt[\d]+)/);
-    return match ? { name: "imdb", id: match[1] } : { name: "imdb" };
-  }
-  if (url.includes("imdb.com/name/")) {
-    const match = url.match(/name\/(nm[\d]+)/);
-    return match ? { name: "imdb-person", id: match[1] } : { name: "imdb-person" };
-  }
-  if (url.includes("themoviedb.org/person/")) {
-    const match = url.match(/\/(\d+)/);
-    return match ? { name: "tmdb-person", id: match[1] } : { name: "tmdb-person" };
-  }
-  if (url.includes("themoviedb.org/movie/") || url.includes("themoviedb.org/tv/")) {
-    const match = url.match(/\/(\d+)/);
-    return match ? { name: "tmdb", type: url.includes("/movie/") ? "movie" : "tv", id: match[1] } : { name: "tmdb" };
+  if (['themoviedb.org', 'www.themoviedb.org'].includes(parsedURL.hostname)) {
+    const match = parsedURL.pathname.match(/^\/(movie|tv|person)\/(\d+)(?:-[^/]+)?(\/(?:seasons|season\/\d+(?:\/episode\/\d+)?))?\/?$/);
+    if (!match || (match[3] && match[1] !== 'tv')) return null;
+    return match[1] === 'person' ? { name: 'tmdb-person', id: match[2] }
+      : { name: 'tmdb', type: match[1], id: match[2] };
   }
   return null;
 }
@@ -228,7 +221,7 @@ function getLdJsonObjects() {
       }
     } catch (e) {}
   });
-  return results;
+  return results.filter(data => data && typeof data === 'object');
 }
 
 function stripRomanSuffix(name) {
@@ -237,22 +230,100 @@ function stripRomanSuffix(name) {
 
 function extractIMDB(imdbId) {
   let title = null;
+  let originalTitle = null;
   let year = null;
   let type = "movie";
+  const isEpisodesSubpage = /^\/title\/tt\d+\/episodes\/?$/.test(window.location.pathname || '');
+
+  // Helper to read IMDb Next.js page data when available
+  const getImdbNextData = () => {
+    const nextEl = document.getElementById("__NEXT_DATA__");
+    if (!nextEl?.textContent) return null;
+    try {
+      return JSON.parse(nextEl.textContent)?.props?.pageProps || null;
+    } catch {
+      return null;
+    }
+  };
+
+  if (isEpisodesSubpage) {
+    type = "tv";
+    const pageProps = getImdbNextData();
+    const entity = pageProps?.contentData?.entityMetadata || pageProps?.aboveTheFoldData;
+    if (entity) {
+      if (entity.titleText?.text) title = cleanText(entity.titleText.text);
+      if (entity.originalTitleText?.text) originalTitle = cleanText(entity.originalTitleText.text);
+      if (entity.releaseYear?.year) year = Number(entity.releaseYear.year) || null;
+    }
+    if (!title) {
+      const sub = document.querySelector("[data-testid='subtitle'], h2[data-testid='subtitle'], .subpage_title_block h3 a, .parent h3 a");
+      if (sub?.textContent) title = cleanText(sub.textContent);
+    }
+    const rawMeta = cleanText(document.querySelector('meta[property="og:title"]')?.content || document.title);
+    if (rawMeta) {
+      const cleanedMeta = rawMeta
+        .replace(/\s*[-–—]\s*IMDb.*$/i, '')
+        .replace(/\s*[-–—]\s*(?:Episode list|Lista odcinków|Episodes|Sezon\s+\d+|Season\s+\d+).*$/i, '')
+        .trim();
+      const m = cleanedMeta.match(/^(.*?)\s*\([^)]*?(\d{4})[^)]*\)/);
+      if (m) {
+        if (!title) title = cleanText(m[1].replace(/\s*(?:—|–|⋆|⭐|★).*/, ''));
+        if (m[2] && !year) year = parseInt(m[2], 10);
+      } else if (!title && cleanedMeta) {
+        title = cleanText(cleanedMeta);
+      }
+    }
+    if (originalTitle && title && originalTitle.toLowerCase() === title.toLowerCase()) originalTitle = null;
+    return title ? (originalTitle ? { imdbId, title, originalTitle, year, type } : { imdbId, title, year, type }) : null;
+  }
 
   // 1. Check all ld+json objects
   const ldObjects = getLdJsonObjects();
   for (const data of ldObjects) {
     const t = data['@type'] || '';
-    if (t === 'TVEpisode') {
-      type = "tv";
-      if (data.partOfSeries && data.partOfSeries.name) title = cleanText(data.partOfSeries.name);
+    if (t === 'TVEpisode' || t === 'TVSeason') {
+      // Search the parent series using only its metadata, never the episode's ID/year.
+      const series = data.partOfSeries || data.partOfSeason?.partOfSeries;
+      let seriesName = series?.name ? cleanText(series.name) : null;
+      let seriesOriginalTitle = null;
+      const date = series?.startDate || series?.datePublished;
+      let seriesYear = date ? parseInt(String(date).slice(0, 4), 10) : null;
+      const seriesURL = series?.url || series?.['@id'] || '';
+      let seriesId = String(seriesURL).match(/title\/(tt\d+)/)?.[1] || null;
+
+      if (!seriesName || !seriesId || !seriesYear) {
+        const pageProps = getImdbNextData();
+        const nextSeries = pageProps?.aboveTheFoldData?.series?.series || pageProps?.mainColumnData?.series?.series;
+        if (nextSeries) {
+          if (!seriesName && nextSeries.titleText?.text) seriesName = cleanText(nextSeries.titleText.text);
+          if (nextSeries.originalTitleText?.text) seriesOriginalTitle = cleanText(nextSeries.originalTitleText.text);
+          if (!seriesId && /^tt\d+$/.test(nextSeries.id || '')) seriesId = nextSeries.id;
+          if (!seriesYear && nextSeries.releaseYear?.year) seriesYear = Number(nextSeries.releaseYear.year) || null;
+        }
+      }
+      if (!seriesName || !seriesId) {
+        const seriesLink = document.querySelector("[data-testid='hero-title-block__series-link'], a[data-testid*='series-link'], .titleParent a[href*='/title/tt']");
+        if (seriesLink) {
+          if (!seriesName && seriesLink.textContent) seriesName = cleanText(seriesLink.textContent);
+          const href = seriesLink.getAttribute?.('href') || seriesLink.href || '';
+          const idMatch = String(href).match(/title\/(tt\d+)/);
+          if (!seriesId && idMatch) seriesId = idMatch[1];
+        }
+      }
+      if (!seriesName) {
+        const rawOg = cleanText(document.querySelector('meta[property="og:title"]')?.content || document.title);
+        const quoted = rawOg.match(/^"([^"]+)"\s+.+?\(TV Episode/i);
+        if (quoted?.[1]) seriesName = cleanText(quoted[1]);
+      }
+      if (!seriesName) return null;
+      const result = { title: seriesName, year: seriesYear || null, imdbId: seriesId, type: "tv" };
+      if (seriesOriginalTitle && seriesOriginalTitle.toLowerCase() !== seriesName.toLowerCase()) {
+        result.originalTitle = seriesOriginalTitle;
+      }
+      return result;
+    } else if (t === 'TVSeries' || t === 'TVMiniSeries' || t === 'CreativeWork') {
       if (!title && data.name) title = cleanText(data.name);
-      if (data.datePublished) year = parseInt(data.datePublished.split('-')[0]);
-      break;
-    } else if (t === 'TVSeries' || t === 'TVSeason' || t === 'TVMiniSeries' || t === 'CreativeWork') {
-      if (!title && data.name) title = cleanText(data.name);
-      if (t === 'TVSeries' || t === 'TVSeason' || t === 'TVMiniSeries') type = "tv";
+      if (t === 'TVSeries' || t === 'TVMiniSeries') type = "tv";
       if (data.datePublished) year = parseInt(data.datePublished.split('-')[0]);
       if (data.startDate) year = parseInt(data.startDate.split('-')[0]);
       if (t === 'TVSeries' || t === 'TVMiniSeries') break;
@@ -275,7 +346,7 @@ function extractIMDB(imdbId) {
     if (og.content.includes("TV Series") || og.content.includes("TV Mini Series") || og.content.includes("TV Special")) {
       type = "tv";
     }
-    const m = og.content.match(/^([^(]+?)(?:\s*\([^)]*?(\d{4})[^)]*\))?/);
+    const m = og.content.match(/^(.*?)\s*\([^)]*?(\d{4})[^)]*\)/) || [og.content, og.content];
     if (m) {
       if (!title) title = cleanText(m[1].replace(/\s*(?:—|–|⋆|⭐|★).*/, ''));
       if (m[2] && !year) year = parseInt(m[2]);
@@ -326,6 +397,7 @@ function playBeep() {
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.18);
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.onended = () => { ctx.close().catch(() => {}); };
       osc.start();
       osc.stop(ctx.currentTime + 0.18);
     } catch (e) {
@@ -378,8 +450,9 @@ async function extractFilmweb(filmwebId) {
   for (const data of ldObjects) {
     const type = data['@type'];
     if (type === 'TVEpisode' || type === 'TVSeason') {
-      if (!title && data.partOfSeries && data.partOfSeries.name) title = cleanText(data.partOfSeries.name);
-      if (!title && data.name) title = cleanText(data.name);
+      const series = data.partOfSeries || data.partOfSeason?.partOfSeries;
+      if (!title && series?.name) title = cleanText(series.name);
+      if (!title && type === 'TVSeason' && data.name) title = cleanText(data.name);
     } else if (type === 'Movie' || type === 'TVSeries' || type === 'CreativeWork') {
       if (!title && data.name) title = cleanText(data.name);
       if (!originalTitle && data.alternateName) originalTitle = cleanText(data.alternateName);
@@ -424,7 +497,12 @@ async function extractFilmweb(filmwebId) {
 
   // Clean season / episode suffixes for TV series
   if (isTv) {
-    const stripTvSuffix = s => s ? s.replace(/\s*[:|–—-]?\s*(?:Sezon|Season|Odcinek|Episode)\s+\d+.*$/i, "").trim() : s;
+    const isEpisodePage = window.location.pathname.includes("/episode/");
+    const stripTvSuffix = s => {
+      if (!s) return s;
+      const cleaned = s.replace(/\s*[:|–—-]?\s*(?:Sezon|Season|Odcinek|Episode)\s+\d+.*$/i, "").trim();
+      return isEpisodePage ? cleaned.replace(/\s*\|\s*.*$/, "").trim() : cleaned;
+    };
     if (title) title = stripTvSuffix(title);
     if (originalTitle) originalTitle = stripTvSuffix(originalTitle);
   }
@@ -464,7 +542,7 @@ function extractFilmwebPerson() {
   const ldObjects = getLdJsonObjects();
   for (const data of ldObjects) {
     if (data['@type'] === 'Person' && data.name) {
-      title = cleanText(data.name);
+      title = stripRomanSuffix(cleanText(data.name));
       if (data.sameAs) {
         const sameAsArr = Array.isArray(data.sameAs) ? data.sameAs : [data.sameAs];
         for (const s of sameAsArr) {
@@ -479,7 +557,7 @@ function extractFilmwebPerson() {
   }
 
   if (!title) {
-    const el = document.querySelector("h1");
+    const el = document.querySelector("h1.personHeaderSection__name, h1.personCoverSection__name, h1[itemprop='name'], h1");
     if (el) title = stripRomanSuffix(cleanText(el.textContent));
   }
 
@@ -487,29 +565,41 @@ function extractFilmwebPerson() {
 }
 
 function extractTMDB(tmdbId, type) {
+  const isSeasonOrEpisode = type === 'tv' && /\/(?:seasons|season\/\d+)/.test(window.location.pathname || '');
   const nextData = document.getElementById("__NEXT_DATA__");
   if (nextData) {
     try {
-      const data = JSON.parse(nextData.textContent);
-      const pageProps = data.props?.pageProps;
-      const details = pageProps?.[type === "movie" ? "movie" : "tv"]
-                    || pageProps?.media
-                    || pageProps?.[`${type}Data`];
+      const props = JSON.parse(nextData.textContent).props?.pageProps;
+      const details = props?.[type === 'movie' ? 'movie' : 'tv'] || props?.media || props?.[`${type}Data`];
       if (details) {
-        const title = details.title || details.name || details.original_title;
-        const dateStr = details.release_date || details.first_air_date || "";
-        const year = dateStr ? parseInt(dateStr.split('-')[0]) : null;
-        const imdbId = details.imdb_id || null;
-        if (title) return { tmdbId, imdbId, title: cleanText(title), year, type };
+        const title = details.title || details.name || details.original_title || details.original_name;
+        const date = details.release_date || details.first_air_date;
+        if (title) return { tmdbId, imdbId: details.imdb_id || null, title: cleanText(title),
+          originalTitle: cleanText(details.original_title || details.original_name),
+          year: date ? parseInt(date, 10) || null : null, type };
       }
-    } catch (e) {}
+    } catch {}
   }
-  const ogTitle = document.querySelector('meta[property="og:title"]');
-  if (ogTitle) {
-    return { tmdbId, title: cleanText(ogTitle.content), year: null, type };
+  if (isSeasonOrEpisode) {
+    const docRaw = cleanText(document.title).replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+    const withoutYear = docRaw.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+    let seriesTitle = withoutYear
+      .replace(/\s*(?:[:|–—-]\s*(?:Sezon|Season|Staffel|Saison|Temporada|Stagione|Series)\s+\d+.*|[-–—]\s*(?:Sezony|Seasons).*)$/i, '')
+      .trim();
+    if (!seriesTitle) {
+      const slugMatch = (window.location.pathname || '').match(/^\/tv\/\d+-([^/]+)/);
+      if (slugMatch) seriesTitle = cleanText(decodeURIComponent(slugMatch[1]).replace(/-/g, ' '));
+    }
+    return seriesTitle ? { tmdbId, title: seriesTitle, year: null, type } : null;
   }
-  const h1 = document.querySelector("h1");
-  return h1 ? { tmdbId, title: cleanText(h1.textContent), year: null, type } : null;
+  const og = document.querySelector('meta[property="og:title"]');
+  const heading = document.querySelector('h2 a[href^="/movie/"], h2 a[href^="/tv/"], h1');
+  const raw = cleanText(og?.content || heading?.textContent);
+  if (!raw) return null;
+  const withoutBrand = raw.replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+  const match = withoutBrand.match(/^(.*?)\s*\((\d{4})\)\s*$/);
+  return { tmdbId, title: match ? cleanText(match[1]) : withoutBrand,
+    year: match ? Number(match[2]) : null, type };
 }
 
 function extractTMDBPerson(personId) {
@@ -518,14 +608,16 @@ function extractTMDBPerson(personId) {
     try {
       const data = JSON.parse(nextData.textContent);
       const details = data.props?.pageProps?.person || data.props?.pageProps?.media;
-      const name = details?.name || details?.title;
-      if (name) return { tmdbId: personId, title: cleanText(name), type: "person" };
+      const name = cleanText(details?.name || details?.title);
+      if (name) return { tmdbId: personId, title: name, type: "person" };
     } catch (e) {}
   }
-  const ogTitle = document.querySelector('meta[property="og:title"]');
-  if (ogTitle) return { tmdbId: personId, title: cleanText(ogTitle.content), type: "person" };
-  const h1 = document.querySelector("h1");
-  return h1 ? { tmdbId: personId, title: cleanText(h1.textContent), type: "person" } : null;
+  const og = document.querySelector('meta[property="og:title"]');
+  const heading = document.querySelector('h2 a[href^="/person/"], h1');
+  const raw = cleanText(og?.content || heading?.textContent);
+  if (!raw) return null;
+  const title = raw.replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+  return title ? { tmdbId: personId, title, type: "person" } : null;
 }
 
 /* ─── Main Execution & SPA Handler ─── */

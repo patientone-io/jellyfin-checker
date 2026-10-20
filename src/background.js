@@ -11,6 +11,37 @@ const DEFAULT_CONFIG = {
   enable_sound_notifications: false
 };
 
+// Serialize all settings writes, including installation, across popup/options contexts.
+let configWrites = Promise.resolve();
+function queueConfigWrite(operation) {
+  const result = configWrites.then(operation);
+  configWrites = result.catch(() => {});
+  return result;
+}
+
+function updateConfig(patch = {}, urlEdit = null) {
+  return queueConfigWrite(async () => {
+    const { config: existing = {} } = await chrome.storage.local.get("config");
+    const config = { ...existing };
+    for (const [key, value] of Object.entries(patch)) {
+      if (!Object.hasOwn(DEFAULT_CONFIG, key)) throw new Error("Unknown setting");
+      const expected = DEFAULT_CONFIG[key];
+      if (Array.isArray(expected) ? !Array.isArray(value) || value.some(v => typeof v !== "string") : typeof value !== typeof expected) {
+        throw new Error("Invalid setting value");
+      }
+      config[key] = value;
+    }
+    if (urlEdit) {
+      if (![0, 1].includes(urlEdit.index) || typeof urlEdit.value !== "string") throw new Error("Invalid URL field");
+      config.jellyfin_urls = [...(config.jellyfin_urls || [])];
+      config.jellyfin_urls[urlEdit.index] = urlEdit.value;
+    }
+    if (Object.hasOwn(patch, "jellyfin_api_key")) delete config.jellyfin_token;
+    await chrome.storage.local.set({ config });
+    return { ok: true };
+  });
+}
+
 async function initializeConfig(details) {
   let defaults = DEFAULT_CONFIG;
   if (details.reason === "install") {
@@ -29,14 +60,25 @@ async function initializeConfig(details) {
     merged.jellyfin_urls = [existing.jellyfin_url];
   }
   delete merged.jellyfin_url;
+  if (!existing.jellyfin_api_key && existing.jellyfin_token) merged.jellyfin_api_key = existing.jellyfin_token;
+  delete merged.jellyfin_token;
   await chrome.storage.local.set({ config: merged });
 }
 
 chrome.runtime.onInstalled.addListener(details => {
-  initializeConfig(details).catch(error => console.error("[JK] Configuration initialization failed:", error));
+  queueConfigWrite(() => initializeConfig(details)).catch(error => console.error("[JK] Configuration initialization failed:", error));
 });
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (!message || typeof message.action !== "string") return false;
+  if (message.action === "update_config") {
+    if (!sender.url?.startsWith(chrome.runtime.getURL(""))) {
+      sendResponse({ ok: false, error: "Settings changes require an extension page" });
+      return false;
+    }
+    updateConfig(message.patch, message.urlEdit).then(sendResponse).catch(error => sendResponse({ ok: false, error: error.message }));
+    return true;
+  }
   if (message.action === "search_jellyfin") {
     handleSearch(message.params).then(sendResponse).catch(err => {
       sendResponse({ error: err.message, found: false });
@@ -80,7 +122,7 @@ async function getConfig() {
       const urls = raw.filter(Boolean);
       resolve({
         jellyfin_urls: urls,
-        jellyfin_api_key: c.jellyfin_token || c.jellyfin_api_key || "",
+        jellyfin_api_key: c.jellyfin_api_key || c.jellyfin_token || "",
         telegram_bot_token: c.telegram_bot_token || "",
         telegram_chat_id: c.telegram_chat_id || "",
         enable_request_button: c.enable_request_button ?? false
@@ -90,29 +132,32 @@ async function getConfig() {
 }
 
 async function handleSearch(params) {
+  if (!params || !['movie', 'tv', 'person'].includes(params.type) || typeof params.title !== 'string' || !params.title.trim() || params.title.length > 500) {
+    return { found: false, error: "Invalid title metadata" };
+  }
   const config = await getConfig();
   if (!config.jellyfin_api_key || !config.jellyfin_urls.length) {
     return { found: false, error: "Configure a Jellyfin URL and API key", configMissing: true };
   }
   const headers = {
-    "Authorization": `MediaBrowser Client="Jellyfin Checker", Device="Browser Extension", DeviceId="jellyfin-checker-ext", Version="1.0.3", Token="${config.jellyfin_api_key}"`,
+    "Authorization": `MediaBrowser Client="Jellyfin Checker", Device="Browser Extension", DeviceId="jellyfin-checker-ext", Version="1.0.4", Token="${config.jellyfin_api_key}"`,
     "X-Emby-Token": config.jellyfin_api_key,
     "accept": "application/json"
   };
   let completed = false;
   let lastError;
   for (const raw of config.jellyfin_urls) {
-    const base = raw.replace(/\/$/, "");
     try {
+      const base = normalizeServerURL(raw);
       if (params.type === "person") {
-        const items = await searchByPerson(base, headers, params.title);
+        const { items, count } = await searchByPerson(base, headers, params.title);
         if (items.length) {
-          return { found: true, count: items.length, jellyfinURL: `${base}/web/#/search.html?query=${encodeURIComponent(params.title)}`, items: items.slice(0, 3) };
+          return { found: true, count, jellyfinURL: `${base}/web/#/search.html?query=${encodeURIComponent(params.title)}`, items: items.slice(0, 3) };
         }
       } else {
         const titles = [...new Set([params.title, params.originalTitle].filter(Boolean))];
         for (const title of titles) {
-          const item = await searchByTitle(base, headers, title, params.year, params.imdbId, params.tmdbId);
+          const item = await searchByTitle(base, headers, title, params.year, params.imdbId, params.tmdbId, params.type);
           if (item) return { found: true, item, jellyfinURL: `${base}/web/#/details?id=${item.Id}` };
         }
       }
@@ -125,15 +170,24 @@ async function handleSearch(params) {
   return completed ? { found: false } : { found: false, error: lastError?.message || "Search failed" };
 }
 
-async function searchByTitle(base, headers, title, year, imdbId, tmdbId) {
-  const resp = await fetch(`${base}/Items?SearchTerm=${encodeURIComponent(title)}&IncludeItemTypes=Movie,Series&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`, { headers, signal: AbortSignal.timeout(5000) });
+async function searchByTitle(base, headers, title, year, imdbId, tmdbId, type) {
+  const itemType = type === "movie" ? "Movie" : type === "tv" ? "Series" : "Movie,Series";
+  const resp = await fetch(`${base}/Items?SearchTerm=${encodeURIComponent(title)}&IncludeItemTypes=${itemType}&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`, { headers, signal: AbortSignal.timeout(5000) });
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const data = await resp.json();
   if (!Array.isArray(data.Items)) throw new Error("Invalid Jellyfin response");
   if (data.Items.length === 0) return null;
 
+  const candidates = data.Items.filter(item => {
+    if (item.Type && itemType !== "Movie,Series" && item.Type !== itemType) return false;
+    const ids = item.ProviderIds || {};
+    if (imdbId && ids.Imdb && ids.Imdb.toLowerCase() !== imdbId.toLowerCase()) return false;
+    if (tmdbId && ids.Tmdb && String(ids.Tmdb) !== String(tmdbId)) return false;
+    return true;
+  });
+
   // 1. Exact ProviderId match if available (highest confidence)
-  for (const item of data.Items) {
+  for (const item of candidates) {
     const pIds = item.ProviderIds || {};
     if (imdbId && pIds.Imdb && pIds.Imdb.toLowerCase() === imdbId.toLowerCase()) {
       return item;
@@ -143,13 +197,11 @@ async function searchByTitle(base, headers, title, year, imdbId, tmdbId) {
     }
   }
 
-  // 2. Similarity match (normalized title or originalTitle)
-  const normalize = s => s.toLowerCase().replace(/[^a-z0-9]/g, "").trim();
-  const target = normalize(title);
-  for (const item of data.Items) {
-    const normName = normalize(item.Name || "");
-    const normOrig = item.OriginalTitle ? normalize(item.OriginalTitle) : "";
-    if (!titleSimilarMatch(normName, target) && !titleSimilarMatch(normOrig, target)) continue;
+  // 2. Similarity match (title or originalTitle, including subtitle variants)
+  for (const item of candidates) {
+    const name = item.Name || "";
+    const orig = item.OriginalTitle || "";
+    if (!titleSimilarMatch(name, title) && !titleSimilarMatch(orig, title)) continue;
     const y = extractYear(item);
     if (year && y && y !== year) {
       // Allow ±2 year tolerance
@@ -166,13 +218,45 @@ async function searchByPerson(base, headers, name) {
   if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
   const data = await resp.json();
   if (!Array.isArray(data.Items)) throw new Error("Invalid Jellyfin response");
-  return data.Items.map(i => ({ name: i.Name, year: i.ProductionYear, type: i.Type, id: i.Id }));
+  const items = data.Items.map(i => ({ name: i.Name, year: i.ProductionYear, type: i.Type, id: i.Id }));
+  return { items, count: Number.isInteger(data.TotalRecordCount) ? Math.max(items.length, data.TotalRecordCount) : items.length };
+}
+
+function normalizeStr(value) {
+  return String(value || '').toLowerCase().replace(/ł/g, 'l').normalize('NFKD')
+    .replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function titleSimilarMatch(item, target) {
-  if (!item || !target) return false;
-  const strip = s => s.replace(/^the/, "").trim();
-  return strip(item) === strip(target) || item.startsWith(target) || target.startsWith(item) || levenshtein(item, target) <= Math.max(2, target.length * 0.15);
+  const strip = value => normalizeStr(value).replace(/^the\s+/, '');
+  const matchSingle = (rawA, rawB) => {
+    const a = strip(rawA), b = strip(rawB);
+    if (!a || !b) return false;
+    if (a === b) return true;
+    // Preserve sequel numbers, including terminal Roman numerals.
+    const numbers = value => JSON.stringify([value.match(/\d+/g) || [], value.match(/\b[ivx]+$/)?.[0] || '']);
+    if (numbers(a) !== numbers(b)) return false;
+    const compactA = a.replace(/\s/g, ''), compactB = b.replace(/\s/g, '');
+    if (Math.min(compactA.length, compactB.length) < 5) return false;
+    const tolerance = Math.max(1, Math.floor(Math.min(compactA.length, compactB.length) * 0.15));
+    if (Math.abs(compactA.length - compactB.length) > tolerance) return false;
+    return levenshtein(compactA, compactB) <= tolerance;
+  };
+  if (matchSingle(item, target)) return true;
+
+  const splitSubtitle = value => {
+    const m = String(value || '').match(/^([^:–—]+?)(?:\s*[:–—]\s*|\s+-\s+)(.+)$/);
+    if (!m) return null;
+    const base = strip(m[1]), sub = normalizeStr(m[2]);
+    if (!base || base.replace(/\s/g, '').length < 4) return null;
+    if (/\b(?:part|czesc|vol|volume|sezon|season|odcinek|episode|ii|iii|iv|v|vi|vii|viii|ix|x|drug[ai]|trzeci[ai]|\d+)\b/.test(sub)) return null;
+    return base;
+  };
+  const baseItem = splitSubtitle(item);
+  const baseTarget = splitSubtitle(target);
+  if (baseItem && !baseTarget && matchSingle(baseItem, target)) return true;
+  if (baseTarget && !baseItem && matchSingle(item, baseTarget)) return true;
+  return false;
 }
 
 function levenshtein(a, b) {
@@ -186,15 +270,28 @@ function levenshtein(a, b) {
 }
 
 function extractYear(item) {
-  if (item.PremiereDate) return new Date(item.PremiereDate).getFullYear();
+  if (item.ProductionYear) return Number(item.ProductionYear);
+    if (item.PremiereDate) return new Date(item.PremiereDate).getUTCFullYear();
   return item.ProductionYear || null;
+}
+
+function normalizeServerURL(value) {
+  const url = new URL(String(value || '').trim());
+  if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+    throw new Error('Use an HTTP(S) server URL without credentials, query or fragment');
+  }
+  return url.href.replace(/\/+$/, '');
 }
 
 async function testConnection(url, apiKey) {
   if (!url || !apiKey) return { success: false, error: "A URL and API key are required" };
-  const base = url.replace(/\/$/, "");
-  const headers = { "X-Emby-Token": apiKey, "accept": "application/json" };
+  const headers = {
+    "Authorization": `MediaBrowser Client="Jellyfin Checker", Device="Browser Extension", DeviceId="jellyfin-checker-ext", Version="1.0.4", Token="${apiKey}"`,
+    "X-Emby-Token": apiKey,
+    "accept": "application/json"
+  };
   try {
+    const base = normalizeServerURL(url);
     const resp = await fetch(`${base}/System/Info`, { headers, signal: AbortSignal.timeout(5000) });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
@@ -225,6 +322,9 @@ async function testTelegram(botToken, chatId) {
 
 // ─── Telegram: request film addition ───
 async function requestAdd(meta, sourceURL) {
+  if (!meta || !['movie', 'tv'].includes(meta.type) || typeof meta.title !== 'string' || !meta.title.trim()) {
+    return { ok: false, error: "Only movie or series requests are supported" };
+  }
   const config = await getConfig();
   const botToken = config.telegram_bot_token;
   const chatId = config.telegram_chat_id;

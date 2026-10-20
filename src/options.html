@@ -2,7 +2,7 @@
 <html lang="pl">
 <head>
   <meta charset="utf-8">
-  <title>Jellyfin Checker — Ustawienia</title>
+  <title>Jellyfin Checker - Ustawienia</title>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
@@ -233,16 +233,16 @@
   <div class="card">
     <h2 data-i18n="headingServer">🎬 Jellyfin Server</h2>
     <div class="field">
-      <label class="label" data-i18n="urlLabel">Jellyfin URL #1</label>
+      <label class="label" data-i18n="urlLabel" for="jellyfin-url">Jellyfin URL #1</label>
       <input type="text" id="jellyfin-url" class="input" placeholder="http://localhost:8096">
     </div>
     <div class="field">
-      <label class="label" data-i18n="urlLabelExt">Jellyfin URL #2</label>
+      <label class="label" data-i18n="urlLabelExt" for="jellyfin-url-external">Jellyfin URL #2</label>
       <input type="text" id="jellyfin-url-external" class="input" placeholder="https://jellyfin.example.com">
-      <p class="hint" id="hint-api">Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada</p>
+      <p class="hint" id="hint-api">Drugi URL opcjonalny - używany gdy pierwszy nie odpowiada</p>
     </div>
     <div class="field">
-      <label class="label" data-i18n="keyLabel">Klucz API</label>
+      <label class="label" data-i18n="keyLabel" for="jellyfin-api-key">Klucz API</label>
       <input type="password" id="jellyfin-api-key" class="input" placeholder="••••••••">
       <p class="hint" id="hint-key">Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz</p>
     </div>
@@ -250,18 +250,18 @@
       <button id="save-btn" class="button button-primary">Zapisz</button>
       <button id="test-btn" class="button button-secondary">Test</button>
     </div>
-    <div id="status-jf" class="status"></div>
+    <div id="status-jf" class="status" role="status" aria-live="polite"></div>
   </div>
 
   <div class="card">
-    <h2 data-i18n="headingTelegram">📢 Telegram — Prośby o dodanie</h2>
+    <h2 data-i18n="headingTelegram">📢 Telegram - Prośby o dodanie</h2>
     <div class="field">
-      <label class="label" data-i18n="labelBotToken">Bot Token</label>
+      <label class="label" data-i18n="labelBotToken" for="telegram-bot-token">Bot Token</label>
       <input type="password" id="telegram-bot-token" class="input" placeholder="123456:ABC-DEF...">
       <p class="hint" id="hint-bot">Stwórz bota przez @BotFather → /newbot</p>
     </div>
     <div class="field">
-      <label class="label" data-i18n="labelChatId">Chat ID</label>
+      <label class="label" data-i18n="labelChatId" for="telegram-chat-id">Chat ID</label>
       <input type="text" id="telegram-chat-id" class="input" placeholder="-1001234567890">
       <p class="hint" id="hint-chat"><span id="hint-chat-before">ID Twojego czatu lub grupy (np. </span><code id="hint-chat-code">-1001234567890</code><span id="hint-chat-after"> dla grupy)</span></p>
     </div>
@@ -269,7 +269,7 @@
       <button id="save-tg-btn" class="button button-primary">Zapisz</button>
       <button id="test-tg-btn" class="button button-secondary">Test Telegram</button>
     </div>
-    <div id="status-tg" class="status"></div>
+    <div id="status-tg" class="status" role="status" aria-live="polite"></div>
   </div>
 
   <div class="card">
@@ -293,7 +293,7 @@
         <div class="toggle-sub" id="toggle-notif-sub">Piszcz przy znalezieniu filmu</div>
       </div>
       <label class="switch">
-        <input type="checkbox" id="toggle-sound">
+        <input type="checkbox" id="toggle-sound" aria-labelledby="toggle-notif-label">
         <span class="slider"></span>
       </label>
     </div>
@@ -303,12 +303,13 @@
         <div class="toggle-sub" id="toggle-request-sub">Pokazuj gdy film nie jest na Jellyfin</div>
       </div>
       <label class="switch">
-        <input type="checkbox" id="toggle-request">
+        <input type="checkbox" id="toggle-request" aria-labelledby="toggle-request-label">
         <span class="slider"></span>
       </label>
     </div>
   </div>
 
+  <script src="settings.js"></script>
   <script src="options.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Jellyfin Checker",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "author": "patientone",
   "description": "Browser extension that checks if movies, shows, or people are available on your Jellyfin server",
   "permissions": [
@@ -52,8 +52,8 @@
   ],
   "browser_specific_settings": {
     "gecko": {
-      "id": "jellyfin-checker@patientone",
-      "strict_min_version": "140.0",
+      "id": "jellyfin-checker@patientone.uk",
+      "strict_min_version": "142.0",
       "data_collection_permissions": {
         "required": ["authenticationInfo", "websiteContent", "browsingActivity"]
       }

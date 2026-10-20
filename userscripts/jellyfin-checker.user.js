@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Jellyfin Checker
 // @namespace    patientone.io
-// @version      1.0.3
+// @version      1.0.4
 // @description  Checks if movies, shows, or people are available on your Jellyfin server. Works with IMDb, Filmweb, and TMDb.
 // @author       patientone
 // @match        https://www.imdb.com/*
@@ -51,7 +51,7 @@
       notFound: "Brak na Jellyfin",
       error: "Błąd połączenia",
       needConfig: "Skonfiguruj Jellyfin",
-      reqText: "Nie znaleziono — chcesz poprosić o dodanie?",
+      reqText: "Nie znaleziono - chcesz poprosić o dodanie?",
       reqBtn: "Poproś o film ▶",
       reqSending: "🔄 Wysyłam...",
       reqSent: "✅ Wysłano!",
@@ -79,7 +79,7 @@
       toggleRequest: "Przycisk prośby",
       toggleRequestSub: "Pokazuj gdy filmu brak na Jellyfin",
       saved: "✅ Zapisano konfigurację!",
-      connected: server => `✅ Połączono z ${server.name} (v${server.version})`,
+      connected: server => `✅ Połączono z ${server.serverName} (v${server.version})`,
       connectFail: err => `❌ Błąd połączenia: ${err}`,
       testSent: "✅ Test Telegram wysłany!",
       testFail: err => `❌ ${err}`,
@@ -93,7 +93,7 @@
       notFound: "Not on Jellyfin",
       error: "Connection error",
       needConfig: "Configure Jellyfin",
-      reqText: "Not found — want to request it?",
+      reqText: "Not found - want to request it?",
       reqBtn: "Request film ▶",
       reqSending: "🔄 Sending...",
       reqSent: "✅ Sent!",
@@ -121,7 +121,7 @@
       toggleRequest: "Request Button",
       toggleRequestSub: "Show when film is not on Jellyfin",
       saved: "✅ Configuration saved!",
-      connected: server => `✅ Connected to ${server.name} (v${server.version})`,
+      connected: server => `✅ Connected to ${server.serverName} (v${server.version})`,
       connectFail: err => `❌ Connection failed: ${err}`,
       testSent: "✅ Test message sent!",
       testFail: err => `❌ ${err}`,
@@ -133,7 +133,7 @@
   function getConfig() {
     const stored = GM_getValue("config", {});
     return {
-      jellyfin_urls: (stored.jellyfin_urls && stored.jellyfin_urls.length && stored.jellyfin_urls[0] !== "") ? stored.jellyfin_urls : DEFAULT_CONFIG.jellyfin_urls,
+      jellyfin_urls: Array.isArray(stored.jellyfin_urls) ? stored.jellyfin_urls : DEFAULT_CONFIG.jellyfin_urls,
       jellyfin_api_key: stored.jellyfin_api_key || DEFAULT_CONFIG.jellyfin_api_key,
       telegram_bot_token: stored.telegram_bot_token || DEFAULT_CONFIG.telegram_bot_token,
       telegram_chat_id: stored.telegram_chat_id || DEFAULT_CONFIG.telegram_chat_id,
@@ -149,8 +149,12 @@
   }
 
   // --- Cache Helpers ---
+  function cacheKey(metadata) {
+    return JSON.stringify([metadata.type, metadata.imdbId || '', metadata.tmdbId || '',
+      normalizeStr(metadata.title), normalizeStr(metadata.originalTitle), metadata.year || '']);
+  }
   function getCachedResult(metadata) {
-    const key = metadata.imdbId || metadata.tmdbId || `title_${normalizeStr(metadata.title)}_${metadata.year || ''}`;
+    const key = cacheKey(metadata);
     const cache = GM_getValue("search_cache_data", {});
     const entry = cache[key];
     if (entry && entry.expiry > Date.now()) {
@@ -160,11 +164,11 @@
   }
 
   function setCachedResult(metadata, value) {
-    const key = metadata.imdbId || metadata.tmdbId || `title_${normalizeStr(metadata.title)}_${metadata.year || ''}`;
+    const key = cacheKey(metadata);
     const cache = GM_getValue("search_cache_data", {});
     const now = Date.now();
     const cleanCache = {};
-    for (const k in cache) {
+    for (const k of Object.keys(cache).slice(-199)) {
       if (cache[k] && cache[k].expiry > now) {
         cleanCache[k] = cache[k];
       }
@@ -237,6 +241,7 @@
       gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.18);
       osc.connect(gain);
       gain.connect(ctx.destination);
+      osc.onended = () => { ctx.close().catch(() => {}); };
       osc.start();
       osc.stop(ctx.currentTime + 0.18);
     } catch (e) {
@@ -246,25 +251,43 @@
 
   // --- Similarity Math & Normalization ---
   const cleanText = str => str ? str.replace(/[\u00A0\s]+/g, " ").trim() : "";
-  const normalizeStr = s => s ? s.toLowerCase().replace(/[^a-z0-9\s]/g, "").replace(/[\s\u00A0]+/g, " ").trim() : "";
+
+
+  function normalizeStr(value) {
+    return String(value || '').toLowerCase().replace(/ł/g, 'l').normalize('NFKD')
+      .replace(/\p{M}/gu, '').replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
+  }
 
   function titleSimilarMatch(item, target) {
-    if (!item || !target) return false;
-    // Strip common leading articles in multiple languages
-    const strip = s => s.replace(/^(the|a|an|el|la|le|les|o|w|y)\s+/i, "").trim();
-    const cleanItem = strip(item);
-    const cleanTarget = strip(target);
-    if (cleanItem === cleanTarget) return true;
+    const strip = value => normalizeStr(value).replace(/^the\s+/, '');
+    const matchSingle = (rawA, rawB) => {
+      const a = strip(rawA), b = strip(rawB);
+      if (!a || !b) return false;
+      if (a === b) return true;
+      // Preserve sequel numbers, including terminal Roman numerals.
+      const numbers = value => JSON.stringify([value.match(/\d+/g) || [], value.match(/\b[ivx]+$/)?.[0] || '']);
+      if (numbers(a) !== numbers(b)) return false;
+      const compactA = a.replace(/\s/g, ''), compactB = b.replace(/\s/g, '');
+      if (Math.min(compactA.length, compactB.length) < 5) return false;
+      const tolerance = Math.max(1, Math.floor(Math.min(compactA.length, compactB.length) * 0.15));
+      if (Math.abs(compactA.length - compactB.length) > tolerance) return false;
+      return levenshtein(compactA, compactB) <= tolerance;
+    };
+    if (matchSingle(item, target)) return true;
 
-    // Try stripping year suffix (e.g. "iron man 2008" -> "iron man")
-    const noYearItem = cleanItem.replace(/\s+\d{4}$/, "").trim();
-    const noYearTarget = cleanTarget.replace(/\s+\d{4}$/, "").trim();
-    if (noYearItem === noYearTarget) return true;
-
-    // Levenshtein check on spaceless representation to allow spelling variations
-    const dist = levenshtein(cleanItem.replace(/\s/g, ""), cleanTarget.replace(/\s/g, ""));
-    const targetLen = cleanTarget.replace(/\s/g, "").length;
-    return dist <= Math.max(1, Math.floor(targetLen * 0.15));
+    const splitSubtitle = value => {
+      const m = String(value || '').match(/^([^:–—]+?)(?:\s*[:–—]\s*|\s+-\s+)(.+)$/);
+      if (!m) return null;
+      const base = strip(m[1]), sub = normalizeStr(m[2]);
+      if (!base || base.replace(/\s/g, '').length < 4) return null;
+      if (/\b(?:part|czesc|vol|volume|sezon|season|odcinek|episode|ii|iii|iv|v|vi|vii|viii|ix|x|drug[ai]|trzeci[ai]|\d+)\b/.test(sub)) return null;
+      return base;
+    };
+    const baseItem = splitSubtitle(item);
+    const baseTarget = splitSubtitle(target);
+    if (baseItem && !baseTarget && matchSingle(baseItem, target)) return true;
+    if (baseTarget && !baseItem && matchSingle(item, baseTarget)) return true;
+    return false;
   }
 
   function levenshtein(a, b) {
@@ -284,7 +307,8 @@
   }
 
   function extractYear(item) {
-    if (item.PremiereDate) return new Date(item.PremiereDate).getFullYear();
+    if (item.ProductionYear) return Number(item.ProductionYear);
+    if (item.PremiereDate) return new Date(item.PremiereDate).getUTCFullYear();
     return item.ProductionYear || null;
   }
 
@@ -292,16 +316,24 @@
   function getJellyfinHeaders(apiKey) {
     const headers = {};
     if (apiKey) {
-      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.3", Token="${apiKey}"`;
+      headers["Authorization"] = `MediaBrowser Client="Jellyfin Checker", Device="Browser", DeviceId="jellyfin-checker", Version="1.0.4", Token="${apiKey}"`;
       headers["X-Emby-Token"] = apiKey;
     }
     return headers;
   }
 
+  function normalizeServerURL(value) {
+    const url = new URL(String(value || '').trim());
+    if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
+      throw new Error('Use an HTTP(S) server URL without credentials, query or fragment');
+    }
+    return url.href.replace(/\/+$/, '');
+  }
+
   async function testConnection(url, apiKey) {
-    const base = url.replace(/\/$/, "");
     const headers = getJellyfinHeaders(apiKey);
     try {
+      const base = normalizeServerURL(url);
       // Wywołujemy /System/Info, które wymaga autoryzacji i faktycznie weryfikuje poprawność klucza API
       const resp = await gmFetch(`${base}/System/Info`, { headers, timeout: 5000 });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -323,7 +355,7 @@
       if (items.length > 0) {
         return {
           found: true,
-          count: items.length,
+          count: Number.isInteger(data.TotalRecordCount) ? Math.max(items.length, data.TotalRecordCount) : items.length,
           jellyfinURL: `${base}/web/#/search.html?query=${encodeURIComponent(params.title)}`,
           items: items.slice(0, 3)
         };
@@ -331,15 +363,20 @@
       return { found: false };
     }
 
+    const itemType = params.type === "movie" ? "Movie" : params.type === "tv" ? "Series" : "Movie,Series";
+
     // Helper for matching item against search parameters (provider IDs or title / originalTitle)
     function isItemMatching(item, target, origTarget, year) {
       if (!item) return false;
+      if (item.Type && itemType !== "Movie,Series" && item.Type !== itemType) return false;
       const pIds = item.ProviderIds || {};
+      if (params.imdbId && pIds.Imdb && pIds.Imdb.toLowerCase() !== params.imdbId.toLowerCase()) return false;
+      if (params.tmdbId && pIds.Tmdb && String(pIds.Tmdb) !== String(params.tmdbId)) return false;
       if (params.imdbId && pIds.Imdb && pIds.Imdb.toLowerCase() === params.imdbId.toLowerCase()) return true;
       if (params.tmdbId && pIds.Tmdb && String(pIds.Tmdb) === String(params.tmdbId)) return true;
 
-      const name = normalizeStr(item.Name || "");
-      const origName = item.OriginalTitle ? normalizeStr(item.OriginalTitle) : "";
+      const name = item.Name || "";
+      const origName = item.OriginalTitle || "";
 
       const titleMatched = (target && (titleSimilarMatch(name, target) || (origName && titleSimilarMatch(origName, target))))
                         || (origTarget && (titleSimilarMatch(name, origTarget) || (origName && titleSimilarMatch(origName, origTarget))));
@@ -357,18 +394,23 @@
     const searchTitle = params.title;
     if (!searchTitle) return { found: false };
 
-    const queryUrl = `${base}/Items?SearchTerm=${encodeURIComponent(searchTitle)}&IncludeItemTypes=Movie,Series&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
+    const queryUrl = `${base}/Items?SearchTerm=${encodeURIComponent(searchTitle)}&IncludeItemTypes=${itemType}&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
     const resp = await gmFetch(queryUrl, { headers, timeout: 5000 });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    
+
     const data = await resp.json();
     if (!Array.isArray(data.Items)) throw new Error("Invalid Jellyfin response");
     const items = data.Items;
 
-    const target = normalizeStr(searchTitle);
-    const origTarget = params.originalTitle ? normalizeStr(params.originalTitle) : null;
+    const target = searchTitle;
+    const origTarget = params.originalTitle || null;
 
-    for (const item of items) {
+    const prioritizeIds = items => [...items].sort((a, b) => {
+      const exact = item => Number(Boolean((params.imdbId && item.ProviderIds?.Imdb?.toLowerCase() === params.imdbId.toLowerCase()) ||
+        (params.tmdbId && String(item.ProviderIds?.Tmdb) === String(params.tmdbId))));
+      return exact(b) - exact(a);
+    });
+    for (const item of prioritizeIds(items)) {
       if (isItemMatching(item, target, origTarget, params.year)) {
         return { found: true, item, jellyfinURL: `${base}/web/#/details?id=${item.Id}` };
       }
@@ -376,7 +418,7 @@
 
     // 4. Try originalTitle text-based search if different
     if (params.originalTitle && params.originalTitle !== params.title) {
-      const queryUrl2 = `${base}/Items?SearchTerm=${encodeURIComponent(params.originalTitle)}&IncludeItemTypes=Movie,Series&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
+      const queryUrl2 = `${base}/Items?SearchTerm=${encodeURIComponent(params.originalTitle)}&IncludeItemTypes=${itemType}&Recursive=true&Fields=ProviderIds,OriginalTitle&Limit=30`;
       const resp2 = await gmFetch(queryUrl2, { headers, timeout: 4000 });
       if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
 
@@ -384,7 +426,7 @@
       if (!Array.isArray(data2.Items)) throw new Error("Invalid Jellyfin response");
       const items2 = data2.Items;
 
-      for (const item of items2) {
+      for (const item of prioritizeIds(items2)) {
         if (isItemMatching(item, target, origTarget, params.year)) {
           return { found: true, item, jellyfinURL: `${base}/web/#/details?id=${item.Id}` };
         }
@@ -395,6 +437,9 @@
   }
 
   async function handleSearch(params, config) {
+    if (!params || !['movie', 'tv', 'person'].includes(params.type) || typeof params.title !== 'string' || !params.title.trim() || params.title.length > 500) {
+      return { found: false, error: "Invalid title metadata" };
+    }
     if (!config.jellyfin_api_key) {
       return { found: false, error: "No API key configured", configMissing: true };
     }
@@ -418,8 +463,8 @@
     let completed = false;
     let lastError;
     for (const raw of sortedUrls) {
-      const base = raw.replace(/\/$/, "");
       try {
+        const base = normalizeServerURL(raw);
         const result = await searchOnServer(base, params, headers);
         GM_setValue("last_working_url", raw);
         if (result.found) return result;
@@ -454,6 +499,9 @@
   }
 
   async function requestAdd(meta, config, sourceURL) {
+    if (!meta || !['movie', 'tv'].includes(meta.type) || typeof meta.title !== 'string' || !meta.title.trim()) {
+      return { ok: false, error: "Only movie or series requests are supported" };
+    }
     const botToken = config.telegram_bot_token;
     const chatId = config.telegram_chat_id;
     if (!botToken || !chatId) {
@@ -494,31 +542,26 @@
     const url = window.location.href;
     const parsedURL = new URL(url);
     if (parsedURL.hostname === "filmweb.pl" || parsedURL.hostname === "www.filmweb.pl") {
-      // Main title/person cards and series seasons; other subpages are excluded.
-      const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/season\/\d+)?\/?$/);
+      // Main title/person cards and series seasons/episodes; other subpages are excluded.
+      const match = parsedURL.pathname.match(/^\/(film|serial|person)\/[^/]+-(\d+)(\/(?:season\/\d+|episode\/\d+(?:\/\d+)?))?\/?$/);
       if (!match || (match[3] && match[1] !== "serial")) return null;
       return { name: match[1] === "person" ? "filmweb-person" : "filmweb", id: match[2] };
     }
-    if (url.includes("imdb.com/title/")) {
-      const match = url.match(/title\/(tt[\d]+)/);
-      return match ? { name: "imdb", id: match[1] } : { name: "imdb" };
+
+    if (['imdb.com', 'www.imdb.com', 'm.imdb.com'].includes(parsedURL.hostname)) {
+      const match = parsedURL.pathname.match(/^\/(title|name)\/((?:tt|nm)\d+)(\/episodes)?\/?$/);
+      if (!match || (match[1] === 'title' ? !match[2].startsWith('tt') : (!match[2].startsWith('nm') || match[3]))) return null;
+      return { name: match[1] === 'title' ? 'imdb' : 'imdb-person', id: match[2] };
     }
-    if (url.includes("imdb.com/name/")) {
-      const match = url.match(/name\/(nm[\d]+)/);
-      return match ? { name: "imdb-person", id: match[1] } : { name: "imdb-person" };
-    }
-    if (url.includes("themoviedb.org/person/")) {
-      const match = url.match(/\/(\d+)/);
-      return match ? { name: "tmdb-person", id: match[1] } : { name: "tmdb-person" };
-    }
-    if (url.includes("themoviedb.org/movie/") || url.includes("themoviedb.org/tv/")) {
-      const match = url.match(/\/(\d+)/);
-      return match ? { name: "tmdb", type: url.includes("/movie/") ? "movie" : "tv", id: match[1] } : { name: "tmdb" };
+    if (['themoviedb.org', 'www.themoviedb.org'].includes(parsedURL.hostname)) {
+      const match = parsedURL.pathname.match(/^\/(movie|tv|person)\/(\d+)(?:-[^/]+)?(\/(?:seasons|season\/\d+(?:\/episode\/\d+)?))?\/?$/);
+      if (!match || (match[3] && match[1] !== 'tv')) return null;
+      return match[1] === 'person' ? { name: 'tmdb-person', id: match[2] }
+        : { name: 'tmdb', type: match[1], id: match[2] };
     }
     return null;
   }
 
-  // Helper to retrieve all JSON-LD parsed objects from the document
   function getLdJsonObjects() {
     const scripts = document.querySelectorAll('script[type="application/ld+json"]');
     const results = [];
@@ -536,26 +579,104 @@
         }
       } catch (e) {}
     });
-    return results;
+    return results.filter(data => data && typeof data === 'object');
   }
 
   function extractIMDB(imdbId) {
     let title = null;
+    let originalTitle = null;
     let year = null;
     let type = "movie";
+    const isEpisodesSubpage = /^\/title\/tt\d+\/episodes\/?$/.test(window.location.pathname || '');
 
+    const getImdbNextData = () => {
+      const nextEl = document.getElementById("__NEXT_DATA__");
+      if (!nextEl?.textContent) return null;
+      try {
+        return JSON.parse(nextEl.textContent)?.props?.pageProps || null;
+      } catch {
+        return null;
+      }
+    };
+
+    if (isEpisodesSubpage) {
+      type = "tv";
+      const pageProps = getImdbNextData();
+      const entity = pageProps?.contentData?.entityMetadata || pageProps?.aboveTheFoldData;
+      if (entity) {
+        if (entity.titleText?.text) title = cleanText(entity.titleText.text);
+        if (entity.originalTitleText?.text) originalTitle = cleanText(entity.originalTitleText.text);
+        if (entity.releaseYear?.year) year = Number(entity.releaseYear.year) || null;
+      }
+      if (!title) {
+        const sub = document.querySelector("[data-testid='subtitle'], h2[data-testid='subtitle'], .subpage_title_block h3 a, .parent h3 a");
+        if (sub?.textContent) title = cleanText(sub.textContent);
+      }
+      const rawMeta = cleanText(document.querySelector('meta[property="og:title"]')?.content || document.title);
+      if (rawMeta) {
+        const cleanedMeta = rawMeta
+          .replace(/\s*[-–—]\s*IMDb.*$/i, '')
+          .replace(/\s*[-–—]\s*(?:Episode list|Lista odcinków|Episodes|Sezon\s+\d+|Season\s+\d+).*$/i, '')
+          .trim();
+        const m = cleanedMeta.match(/^(.*?)\s*\([^)]*?(\d{4})[^)]*\)/);
+        if (m) {
+          if (!title) title = cleanText(m[1].replace(/\s*(?:—|–|⋆|⭐|★).*/, ''));
+          if (m[2] && !year) year = parseInt(m[2], 10);
+        } else if (!title && cleanedMeta) {
+          title = cleanText(cleanedMeta);
+        }
+      }
+      if (originalTitle && title && originalTitle.toLowerCase() === title.toLowerCase()) originalTitle = null;
+      return title ? (originalTitle ? { imdbId, title, originalTitle, year, type } : { imdbId, title, year, type }) : null;
+    }
+
+    // 1. Check all ld+json objects
     const ldObjects = getLdJsonObjects();
     for (const data of ldObjects) {
       const t = data['@type'] || '';
-      if (t === 'TVEpisode') {
-        type = "tv";
-        if (data.partOfSeries && data.partOfSeries.name) title = cleanText(data.partOfSeries.name);
+      if (t === 'TVEpisode' || t === 'TVSeason') {
+        // Search the parent series using only its metadata, never the episode's ID/year.
+        const series = data.partOfSeries || data.partOfSeason?.partOfSeries;
+        let seriesName = series?.name ? cleanText(series.name) : null;
+        let seriesOriginalTitle = null;
+        const date = series?.startDate || series?.datePublished;
+        let seriesYear = date ? parseInt(String(date).slice(0, 4), 10) : null;
+        const seriesURL = series?.url || series?.['@id'] || '';
+        let seriesId = String(seriesURL).match(/title\/(tt\d+)/)?.[1] || null;
+
+        if (!seriesName || !seriesId || !seriesYear) {
+          const pageProps = getImdbNextData();
+          const nextSeries = pageProps?.aboveTheFoldData?.series?.series || pageProps?.mainColumnData?.series?.series;
+          if (nextSeries) {
+            if (!seriesName && nextSeries.titleText?.text) seriesName = cleanText(nextSeries.titleText.text);
+            if (nextSeries.originalTitleText?.text) seriesOriginalTitle = cleanText(nextSeries.originalTitleText.text);
+            if (!seriesId && /^tt\d+$/.test(nextSeries.id || '')) seriesId = nextSeries.id;
+            if (!seriesYear && nextSeries.releaseYear?.year) seriesYear = Number(nextSeries.releaseYear.year) || null;
+          }
+        }
+        if (!seriesName || !seriesId) {
+          const seriesLink = document.querySelector("[data-testid='hero-title-block__series-link'], a[data-testid*='series-link'], .titleParent a[href*='/title/tt']");
+          if (seriesLink) {
+            if (!seriesName && seriesLink.textContent) seriesName = cleanText(seriesLink.textContent);
+            const href = seriesLink.getAttribute?.('href') || seriesLink.href || '';
+            const idMatch = String(href).match(/title\/(tt\d+)/);
+            if (!seriesId && idMatch) seriesId = idMatch[1];
+          }
+        }
+        if (!seriesName) {
+          const rawOg = cleanText(document.querySelector('meta[property="og:title"]')?.content || document.title);
+          const quoted = rawOg.match(/^"([^"]+)"\s+.+?\(TV Episode/i);
+          if (quoted?.[1]) seriesName = cleanText(quoted[1]);
+        }
+        if (!seriesName) return null;
+        const result = { title: seriesName, year: seriesYear || null, imdbId: seriesId, type: "tv" };
+        if (seriesOriginalTitle && seriesOriginalTitle.toLowerCase() !== seriesName.toLowerCase()) {
+          result.originalTitle = seriesOriginalTitle;
+        }
+        return result;
+      } else if (t === 'TVSeries' || t === 'TVMiniSeries' || t === 'CreativeWork') {
         if (!title && data.name) title = cleanText(data.name);
-        if (data.datePublished) year = parseInt(data.datePublished.split('-')[0]);
-        break;
-      } else if (t === 'TVSeries' || t === 'TVSeason' || t === 'TVMiniSeries' || t === 'CreativeWork') {
-        if (!title && data.name) title = cleanText(data.name);
-        if (t === 'TVSeries' || t === 'TVSeason' || t === 'TVMiniSeries') type = "tv";
+        if (t === 'TVSeries' || t === 'TVMiniSeries') type = "tv";
         if (data.datePublished) year = parseInt(data.datePublished.split('-')[0]);
         if (data.startDate) year = parseInt(data.startDate.split('-')[0]);
         if (t === 'TVSeries' || t === 'TVMiniSeries') break;
@@ -566,28 +687,32 @@
       }
     }
 
+    // 2. DOM selector with hero__primary-text or data-testid
     if (!title) {
       const h1 = document.querySelector("h1[data-testid='hero__pageTitle'] span.hero__primary-text, h1[data-testid='hero__pageTitle'], h1");
       if (h1) title = cleanText(h1.textContent);
     }
 
+    // 3. og:title meta (e.g. "MobLand (TV Series 2025– ) ⭐ 8.1" or "Matrix (1999)")
     const og = document.querySelector('meta[property="og:title"]');
     if (og && og.content) {
       if (og.content.includes("TV Series") || og.content.includes("TV Mini Series") || og.content.includes("TV Special")) {
         type = "tv";
       }
-      const m = og.content.match(/^([^(]+?)(?:\s*\([^)]*?(\d{4})[^)]*\))?/);
+      const m = og.content.match(/^(.*?)\s*\([^)]*?(\d{4})[^)]*\)/) || [og.content, og.content];
       if (m) {
         if (!title) title = cleanText(m[1].replace(/\s*(?:—|–|⋆|⭐|★).*/, ''));
         if (m[2] && !year) year = parseInt(m[2]);
       }
     }
 
+    // 4. og:type meta
     const ogType = document.querySelector('meta[property="og:type"]');
     if (ogType && ogType.content && (ogType.content.includes("tv_show") || ogType.content.includes("tv_series"))) {
       type = "tv";
     }
 
+    // 5. Look for TV badges in hero subnav bar
     if (type !== "tv") {
       const subnav = document.querySelector("[data-testid='hero-subnav-bar-left']");
       if (subnav && (subnav.textContent.includes("TV Series") || subnav.textContent.includes("TV Mini Series"))) {
@@ -607,13 +732,13 @@
     const ldObjects = getLdJsonObjects();
     for (const data of ldObjects) {
       if (data['@type'] === 'Person' && data.name) {
-        title = stripRomanSuffix(data.name.trim());
+        title = stripRomanSuffix(cleanText(data.name));
         break;
       }
     }
     if (!title) {
       const el = document.querySelector("h1");
-      if (el) title = stripRomanSuffix(el.textContent.trim());
+      if (el) title = stripRomanSuffix(cleanText(el.textContent));
     }
     return title ? { imdbId, title, type: "person" } : null;
   }
@@ -660,8 +785,9 @@
     for (const data of ldObjects) {
       const type = data['@type'];
       if (type === 'TVEpisode' || type === 'TVSeason') {
-        if (!title && data.partOfSeries && data.partOfSeries.name) title = cleanText(data.partOfSeries.name);
-        if (!title && data.name) title = cleanText(data.name);
+        const series = data.partOfSeries || data.partOfSeason?.partOfSeries;
+        if (!title && series?.name) title = cleanText(series.name);
+        if (!title && type === 'TVSeason' && data.name) title = cleanText(data.name);
       } else if (type === 'Movie' || type === 'TVSeries' || type === 'CreativeWork') {
         if (!title && data.name) title = cleanText(data.name);
         if (!originalTitle && data.alternateName) originalTitle = cleanText(data.alternateName);
@@ -706,7 +832,12 @@
 
     // Clean season / episode suffixes for TV series
     if (isTv) {
-      const stripTvSuffix = s => s ? s.replace(/\s*[:|–—-]?\s*(?:Sezon|Season|Odcinek|Episode)\s+\d+.*$/i, "").trim() : s;
+      const isEpisodePage = window.location.pathname.includes("/episode/");
+      const stripTvSuffix = s => {
+        if (!s) return s;
+        const cleaned = s.replace(/\s*[:|–—-]?\s*(?:Sezon|Season|Odcinek|Episode)\s+\d+.*$/i, "").trim();
+        return isEpisodePage ? cleaned.replace(/\s*\|\s*.*$/, "").trim() : cleaned;
+      };
       if (title) title = stripTvSuffix(title);
       if (originalTitle) originalTitle = stripTvSuffix(originalTitle);
     }
@@ -760,7 +891,9 @@
     const ldObjects = getLdJsonObjects();
     for (const data of ldObjects) {
       if (data['@type'] === 'Person' || data.name) {
-        if (!title && data.name && (data['@type'] === 'Person' || !data['@type'])) title = cleanText(data.name);
+        if (!title && data.name && (data['@type'] === 'Person' || !data['@type'])) {
+          title = stripRomanSuffix(cleanText(data.name));
+        }
         if (!imdbId && data.sameAs) {
           const sameAsArr = Array.isArray(data.sameAs) ? data.sameAs : [data.sameAs];
           for (const s of sameAsArr) {
@@ -782,29 +915,41 @@
   }
 
   function extractTMDB(tmdbId, type) {
+    const isSeasonOrEpisode = type === 'tv' && /\/(?:seasons|season\/\d+)/.test(window.location.pathname || '');
     const nextData = document.getElementById("__NEXT_DATA__");
     if (nextData) {
       try {
-        const data = JSON.parse(nextData.textContent);
-        const pageProps = data.props?.pageProps;
-        const details = pageProps?.[type === "movie" ? "movie" : "tv"]
-                      || pageProps?.media
-                      || pageProps?.[`${type}Data`];
+        const props = JSON.parse(nextData.textContent).props?.pageProps;
+        const details = props?.[type === 'movie' ? 'movie' : 'tv'] || props?.media || props?.[`${type}Data`];
         if (details) {
-          const title = details.title || details.name || details.original_title;
-          const dateStr = details.release_date || details.first_air_date || "";
-          const year = dateStr ? parseInt(dateStr.split('-')[0]) : null;
-          const imdbId = details.imdb_id || null;
-          if (title) return { tmdbId, imdbId, title, year, type };
+          const title = details.title || details.name || details.original_title || details.original_name;
+          const date = details.release_date || details.first_air_date;
+          if (title) return { tmdbId, imdbId: details.imdb_id || null, title: cleanText(title),
+            originalTitle: cleanText(details.original_title || details.original_name),
+            year: date ? parseInt(date, 10) || null : null, type };
         }
-      } catch (e) {}
+      } catch {}
     }
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) {
-      return { tmdbId, title: ogTitle.content, year: null, type };
+    if (isSeasonOrEpisode) {
+      const docRaw = cleanText(document.title).replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+      const withoutYear = docRaw.replace(/\s*\(\d{4}\)\s*$/, '').trim();
+      let seriesTitle = withoutYear
+        .replace(/\s*(?:[:|–—-]\s*(?:Sezon|Season|Staffel|Saison|Temporada|Stagione|Series)\s+\d+.*|[-–—]\s*(?:Sezony|Seasons).*)$/i, '')
+        .trim();
+      if (!seriesTitle) {
+        const slugMatch = (window.location.pathname || '').match(/^\/tv\/\d+-([^/]+)/);
+        if (slugMatch) seriesTitle = cleanText(decodeURIComponent(slugMatch[1]).replace(/-/g, ' '));
+      }
+      return seriesTitle ? { tmdbId, title: seriesTitle, year: null, type } : null;
     }
-    const h1 = document.querySelector("h1");
-    return h1 ? { tmdbId, title: h1.textContent.trim(), year: null, type } : null;
+    const og = document.querySelector('meta[property="og:title"]');
+    const heading = document.querySelector('h2 a[href^="/movie/"], h2 a[href^="/tv/"], h1');
+    const raw = cleanText(og?.content || heading?.textContent);
+    if (!raw) return null;
+    const withoutBrand = raw.replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+    const match = withoutBrand.match(/^(.*?)\s*\((\d{4})\)\s*$/);
+    return { tmdbId, title: match ? cleanText(match[1]) : withoutBrand,
+      year: match ? Number(match[2]) : null, type };
   }
 
   function extractTMDBPerson(personId) {
@@ -813,14 +958,16 @@
       try {
         const data = JSON.parse(nextData.textContent);
         const details = data.props?.pageProps?.person || data.props?.pageProps?.media;
-        const name = details?.name || details?.title;
+        const name = cleanText(details?.name || details?.title);
         if (name) return { tmdbId: personId, title: name, type: "person" };
       } catch (e) {}
     }
-    const ogTitle = document.querySelector('meta[property="og:title"]');
-    if (ogTitle) return { tmdbId: personId, title: ogTitle.content, type: "person" };
-    const h1 = document.querySelector("h1");
-    return h1 ? { tmdbId: personId, title: h1.textContent.trim(), type: "person" } : null;
+    const og = document.querySelector('meta[property="og:title"]');
+    const heading = document.querySelector('h2 a[href^="/person/"], h1');
+    const raw = cleanText(og?.content || heading?.textContent);
+    if (!raw) return null;
+    const title = raw.replace(/\s*[-–—]\s*The Movie Database.*$/i, '').trim();
+    return title ? { tmdbId: personId, title, type: "person" } : null;
   }
 
   function waitForElement(selector, maxWait = 5000) {
@@ -845,6 +992,7 @@
   function showBadge(text, url, gradient, requestable = null, metadata = null) {
     const t = i18n[getLang()] || i18n.en;
     removeExistingBadge();
+    const sourceURL = window.location.href;
 
     const wrapper = document.createElement("div");
     wrapper.id = "jellyfin-keeper-wrapper";
@@ -878,7 +1026,7 @@
     refreshBtn.addEventListener("click", (e) => {
       e.stopPropagation();
       if (metadata) {
-        const key = metadata.imdbId || metadata.tmdbId || `title_${normalizeStr(metadata.title)}_${metadata.year || ''}`;
+        const key = cacheKey(metadata);
         const cache = GM_getValue("search_cache_data", {});
         delete cache[key];
         GM_setValue("search_cache_data", cache);
@@ -943,7 +1091,7 @@
     wrapper.appendChild(container);
 
     // Request Button
-    if (requestable && metadata?.title) {
+    if (requestable && metadata?.title && ["movie", "tv"].includes(metadata.type)) {
       const config = getConfig();
       const lang = getLang();
       const t = i18n[lang] || i18n.en;
@@ -953,11 +1101,12 @@
       reqBtn.style.cssText = "background:#1e293b;border:1px solid #475569;color:#e2e8f0;padding:6px 14px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer;transition:background .2s,border-color .2s;font-family:inherit;box-shadow:0 3px 6px rgba(0,0,0,.2);";
       reqBtn.addEventListener("click", async (e) => {
         e.stopPropagation();
+        reqBtn.disabled = true;
         reqBtn.style.pointerEvents = "none";
         reqBtn.style.opacity = "0.6";
         reqBtn.textContent = t.reqSending;
 
-        const res = await requestAdd(metadata, config, window.location.href);
+        const res = await requestAdd(metadata, config, sourceURL);
         if (res.ok) {
           reqBtn.style.background = "#064e3b";
           reqBtn.style.borderColor = "#15803d";
@@ -966,6 +1115,7 @@
           reqBtn.style.cursor = "default";
           setTimeout(() => reqBtn.remove(), 4000);
         } else {
+          reqBtn.disabled = false;
           reqBtn.style.background = "#7f1d1d";
           reqBtn.style.borderColor = "#991b1b";
           reqBtn.style.color = "#fca5a5";
@@ -1000,7 +1150,7 @@
       #jk-toggle-request:checked + #jk-slider-req { background-color: #15803d !important; }
       #jk-toggle-sound:checked + #jk-slider-sound:before { transform: translateX(20px); }
       #jk-toggle-request:checked + #jk-slider-req:before { transform: translateX(20px); }
-      
+
       .jk-btn-active {
         border-color: #0082C8 !important;
         color: #e2e8f0 !important;
@@ -1030,7 +1180,7 @@
 
     modal.innerHTML = `
       <div style="background:#1e293b;border:1px solid #334155;border-radius:16px;width:100%;max-width:500px;padding:24px;box-shadow:0 12px 30px rgba(0,0,0,0.5);box-sizing:border-box;max-height:92vh;overflow-y:auto;position:relative;">
-        
+
         <!-- Header -->
         <div style="display:flex;justify-content:between;align-items:center;border-bottom:1px solid #334155;padding-bottom:12px;margin-bottom:20px;justify-content:space-between;">
           <h2 id="jk-title" style="margin:0;font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;color:#fff;">
@@ -1068,7 +1218,7 @@
 
         <!-- Section 2: Telegram Config -->
         <div style="margin-bottom:20px;border-top:1px solid #334155;padding-top:16px;">
-          <h3 id="jk-sec-tg" style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 12px 0;">Telegram — Prośby o dodanie</h3>
+          <h3 id="jk-sec-tg" style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 12px 0;">Telegram - Prośby o dodanie</h3>
           <div style="margin-bottom:12px;">
             <label id="jk-lbl-bot" style="display:block;font-size:11px;color:#94a3b8;text-transform:uppercase;margin-bottom:4px;font-weight:600;">Bot Token</label>
             <input type="password" id="jk-bot-token" placeholder="123456:ABC-DEF..." style="width:100%;background:#0f172a;border:1px solid #334155;color:#e2e8f0;padding:8px 12px;border-radius:6px;font-size:13px;font-family:monospace;box-sizing:border-box;">
@@ -1089,7 +1239,7 @@
         <!-- Section 3: General Options -->
         <div style="margin-bottom:24px;border-top:1px solid #334155;padding-top:16px;">
           <h3 id="jk-sec-opts" style="font-size:13px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin:0 0 12px 0;">Ustawienia</h3>
-          
+
           <!-- Sound toggle -->
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
             <div>
@@ -1126,7 +1276,7 @@
     document.body.appendChild(modal);
 
     // Event Wireups
-    document.getElementById("btn-jk-close").addEventListener("click", () => { modal.style.display = "none"; });
+    document.getElementById("btn-jk-close").addEventListener("click", () => { modal.remove(); });
     document.getElementById("btn-jk-pl").addEventListener("click", () => { changeLanguage("pl"); });
     document.getElementById("btn-jk-en").addEventListener("click", () => { changeLanguage("en"); });
 
@@ -1160,9 +1310,11 @@
       const urls = [url1, url2].filter(Boolean);
 
       let working = null;
+      let connectionError = badgeTextSync("fillFields");
       for (const url of urls) {
         const res = await testConnection(url, key);
         if (res.success) { working = res; break; }
+        connectionError = res.error;
       }
 
       btn.disabled = false;
@@ -1171,7 +1323,7 @@
       if (working) {
         showStatus("jk-status-server", false, badgeTextSync("connected", working));
       } else {
-        showStatus("jk-status-server", true, badgeTextSync("connectFail", "Unreachable"));
+        showStatus("jk-status-server", true, badgeTextSync("connectFail", connectionError));
       }
     });
 
@@ -1320,12 +1472,13 @@
   async function run(bypassCache = false) {
     const generation = ++checkGeneration;
     const sourceURL = window.location.href;
-    const isCurrent = () => generation === checkGeneration && sourceURL === window.location.href;
+    const configSnapshot = JSON.stringify(getConfig());
+    const isCurrent = () => generation === checkGeneration && sourceURL === window.location.href && configSnapshot === JSON.stringify(getConfig());
     const render = (...args) => { if (isCurrent()) showBadge(...args); };
-    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.3...");
+    console.log("[JK] Loading Userscript Jellyfin Checker v1.0.4...");
 
     // Auto-clear cache on version upgrade
-    const CURRENT_VERSION = "1.0.3";
+    const CURRENT_VERSION = "1.0.4";
     const storedVer = GM_getValue("last_installed_version", "");
     if (storedVer !== CURRENT_VERSION) {
       GM_setValue("search_cache_data", {});
@@ -1344,69 +1497,74 @@
     const url = window.location.href;
     if (url.includes("/web/") && (url.includes("#/details") || url.includes("#!/details"))) return;
 
-    if (!site.name.startsWith("tmdb")) {
-      await waitForElement("h1", 4000);
-    }
+    try {
+      if (!site.name.startsWith("tmdb")) {
+        await waitForElement("h1", 4000);
+      }
 
-    if (!isCurrent()) return;
-    let metadata = null;
-    switch (site.name) {
-      case "imdb": metadata = extractIMDB(site.id); break;
-      case "imdb-person": metadata = extractIMDBPerson(site.id); break;
-      case "filmweb": metadata = await extractFilmweb(site.id); break;
-      case "filmweb-person": metadata = extractFilmwebPerson(); break;
-      case "tmdb": metadata = extractTMDB(site.id, site.type); break;
-      case "tmdb-person": metadata = extractTMDBPerson(site.id); break;
-    }
-
-    if (!isCurrent()) return;
-    console.log("[JK] Scraped metadata:", metadata);
-    if (!metadata || !metadata.title) {
-      render(await badgeText("noTitle"), null, "linear-gradient(135deg, #b45309, #78350f)");
-      return;
-    }
-
-    const config = getConfig();
-    if (!config.jellyfin_api_key) {
-      render(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
-      return;
-    }
-
-    // Sprawdzenie pamięci podręcznej (Cache)
-    let response = bypassCache ? null : getCachedResult(metadata);
-    let isCacheHit = !bypassCache && !!response;
-    if (response) {
-      console.log("[JK] Cache hit (użyto zapamiętanego wyniku):", response);
-    } else {
-      isCacheHit = false;
-      render(await badgeText("checking"), null, "linear-gradient(135deg, #4338ca, #1e40af)");
-      response = await handleSearch(metadata, config);
       if (!isCurrent()) return;
-      console.log("[JK] Search response:", response);
+      let metadata = null;
+      switch (site.name) {
+        case "imdb": metadata = extractIMDB(site.id); break;
+        case "imdb-person": metadata = extractIMDBPerson(site.id); break;
+        case "filmweb": metadata = await extractFilmweb(site.id); break;
+        case "filmweb-person": metadata = extractFilmwebPerson(); break;
+        case "tmdb": metadata = extractTMDB(site.id, site.type); break;
+        case "tmdb-person": metadata = extractTMDBPerson(site.id); break;
+      }
 
-      if (response.configMissing) {
+      if (!isCurrent()) return;
+      console.log("[JK] Scraped metadata:", metadata);
+      if (!metadata || !metadata.title) {
+        render(await badgeText("noTitle"), null, "linear-gradient(135deg, #b45309, #78350f)");
+        return;
+      }
+
+      const config = getConfig();
+      if (!config.jellyfin_api_key) {
         render(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
         return;
       }
-      if (response.error) {
-        render(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)");
-        return;
-      }
 
-      setCachedResult(metadata, response);
-    }
-
-    if (response.found) {
-      if (response.count !== undefined) {
-        render(await badgeText("foundMany", response.count), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+      // Sprawdzenie pamięci podręcznej (Cache)
+      let response = bypassCache ? null : getCachedResult(metadata);
+      let isCacheHit = !bypassCache && !!response;
+      if (response) {
+        console.log("[JK] Cache hit (użyto zapamiętanego wyniku):", response);
       } else {
-        render(await badgeText("found"), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+        isCacheHit = false;
+        render(await badgeText("checking"), null, "linear-gradient(135deg, #4338ca, #1e40af)");
+        response = await handleSearch(metadata, config);
+        if (!isCurrent()) return;
+        console.log("[JK] Search response:", response);
+
+        if (response.configMissing) {
+          render(await badgeText("needConfig"), null, "linear-gradient(135deg, #b45309, #78350f)");
+          return;
+        }
+        if (response.error) {
+          render(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)");
+          return;
+        }
+
+        setCachedResult(metadata, response);
       }
-      if (isCurrent() && config.enable_sound_notifications && !isCacheHit) {
-        playBeep();
+
+      if (response.found) {
+        if (response.count !== undefined) {
+          render(await badgeText("foundMany", response.count), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+        } else {
+          render(await badgeText("found"), response.jellyfinURL, "linear-gradient(135deg, #1a2f42, #15803d)", null, metadata);
+        }
+        if (isCurrent() && config.enable_sound_notifications && !isCacheHit) {
+          playBeep();
+        }
+      } else {
+        render(await badgeText("notFound"), null, "linear-gradient(135deg, #1a2f42, #991b1b)", config.enable_request_button, metadata);
       }
-    } else {
-      render(await badgeText("notFound"), null, "linear-gradient(135deg, #1a2f42, #991b1b)", config.enable_request_button, metadata);
+    } catch (error) {
+      console.warn("[JK] Check failed:", error.message);
+      render(await badgeText("error"), null, "linear-gradient(135deg, #4b5563, #1f2937)");
     }
   }
 
@@ -1421,7 +1579,8 @@
     if (window.location.href !== lastHandledUrl) {
       lastHandledUrl = window.location.href;
       console.log("[JK] SPA navigation detected:", lastHandledUrl);
-      restartApp();
+      removeExistingBadge();
+      run();
     }
   }
 

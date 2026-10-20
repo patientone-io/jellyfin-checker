@@ -1,0 +1,14 @@
+{
+  "name": "jellyfin-checker",
+  "version": "1.0.4",
+  "private": true,
+  "description": "Development checks for Jellyfin Checker and its standalone userscripts",
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "build": "bash build.sh all",
+    "test:browser": "node tests/browser-smoke.cjs",
+    "check": "npm test && npm run build"
+  },
+  "engines": { "node": ">=22" },
+  "devDependencies": { "playwright": "1.64.1" }
+}

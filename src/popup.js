@@ -7,7 +7,7 @@ const TRANSLATIONS = {
     urlLabel: "Jellyfin URL #1",
     urlPlaceholder: "http://localhost:8096",
     urlLabelExt: "Jellyfin URL #2",
-    hintApi: "Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada",
+    hintApi: "Drugi URL opcjonalny - używany gdy pierwszy nie odpowiada",
     keyLabel: "Klucz API",
     keyPlaceholder: "••••••••",
     hintKey: "Jellyfin → Dashboard → Ustawienia → Klucze API",
@@ -41,7 +41,7 @@ const TRANSLATIONS = {
     urlLabel: "Jellyfin URL #1",
     urlPlaceholder: "http://localhost:8096",
     urlLabelExt: "Jellyfin URL #2",
-    hintApi: "Second URL is optional — used when the first is unreachable",
+    hintApi: "Second URL is optional - used when the first is unreachable",
     keyLabel: "API Key",
     keyPlaceholder: "••••••••",
     hintKey: "Jellyfin → Dashboard → Settings → API Keys",
@@ -98,8 +98,10 @@ function applyTheme(theme) {
   }
 }
 
-function setLanguage(lang) {
+function setLanguage(lang, persist = true) {
+  lang = Object.hasOwn(TRANSLATIONS, lang) ? lang : detectBrowserLang();
   currentLang = lang;
+  document.documentElement.lang = lang;
   const t = TRANSLATIONS[lang];
 
   document.querySelectorAll("[data-i18n]").forEach(el => {
@@ -125,10 +127,7 @@ function setLanguage(lang) {
 
   applyTheme(currentTheme);
 
-  chrome.storage.local.get("config", (result) => {
-    const config = result.config || {};
-    chrome.storage.local.set({ config: { ...config, language: lang } });
-  });
+  if (persist) saveSettings({ language: lang });
 }
 
 function showStatus(elementId, message, type) {
@@ -143,7 +142,7 @@ function showStatus(elementId, message, type) {
   }
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const urlInput = document.getElementById("jellyfin-url");
   const extInput = document.getElementById("jellyfin-url-external");
   const apiKeyInput = document.getElementById("jellyfin-api-key");
@@ -173,7 +172,8 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Load config
-  chrome.storage.local.get("config", (result) => {
+  {
+    const result = await chrome.storage.local.get("config");
     const config = result.config || {};
     urlInput.value = config.jellyfin_urls?.[0] || '';
     if (extInput) extInput.value = config.jellyfin_urls?.[1] || '';
@@ -185,9 +185,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (toggleRequest) toggleRequest.checked = config.enable_request_button ?? false;
 
     currentLang = config.language || detectBrowserLang();
-    setLanguage(currentLang);
+    setLanguage(currentLang, false);
     applyTheme(config.theme || "system");
-  });
+  }
 
   // Theme button cycle: system -> dark -> light -> system
   if (themeBtn) {
@@ -198,10 +198,7 @@ document.addEventListener("DOMContentLoaded", () => {
       else if (currentTheme === "light") next = "system";
 
       applyTheme(next);
-      chrome.storage.local.get("config", (result) => {
-        const config = result.config || {};
-        chrome.storage.local.set({ config: { ...config, theme: next } });
-      });
+      saveSettings({ theme: next });
     });
   }
 
@@ -216,51 +213,22 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Autosave function for all fields
-  function autoSave() {
-    const url1 = urlInput.value.trim();
-    const url2 = extInput ? extInput.value.trim() : '';
-    const key = apiKeyInput.value.trim();
-    const bot = tgTokenInput.value.trim();
-    const chat = tgChatInput.value.trim();
-
-    chrome.storage.local.get("config", (result) => {
-      const existing = result.config || {};
-      const config = {
-        ...existing,
-        jellyfin_urls: [url1, url2].filter(Boolean),
-        jellyfin_api_key: key,
-        telegram_bot_token: bot,
-        telegram_chat_id: chat
-      };
-      chrome.storage.local.set({ config });
-    });
-  }
-
-  urlInput.addEventListener("input", autoSave);
-  if (extInput) extInput.addEventListener("input", autoSave);
-  apiKeyInput.addEventListener("input", autoSave);
-  tgTokenInput.addEventListener("input", autoSave);
-  tgChatInput.addEventListener("input", autoSave);
+  const textFields = [
+    [urlInput, "jellyfin_urls", 0],
+    [extInput, "jellyfin_urls", 1],
+    [apiKeyInput, "jellyfin_api_key"],
+    [tgTokenInput, "telegram_bot_token"],
+    [tgChatInput, "telegram_chat_id"]
+  ];
+  bindSettingsFields(textFields);
 
   // Toggle checkboxes autosave
-  toggleSound?.addEventListener("change", () => {
-    chrome.storage.local.get("config", (result) => {
-      const config = result.config || {};
-      config.enable_sound_notifications = toggleSound.checked;
-      chrome.storage.local.set({ config });
-    });
-  });
+  toggleSound?.addEventListener("change", () => saveSettings({ enable_sound_notifications: toggleSound.checked }));
 
-  toggleRequest?.addEventListener("change", () => {
-    chrome.storage.local.get("config", (result) => {
-      const config = result.config || {};
-      config.enable_request_button = toggleRequest.checked;
-      chrome.storage.local.set({ config });
-    });
-  });
+  toggleRequest?.addEventListener("change", () => saveSettings({ enable_request_button: toggleRequest.checked }));
 
   // Save server config
-  saveBtn.addEventListener("click", () => {
+  saveBtn.addEventListener("click", async () => {
     const url1 = urlInput.value.trim();
     const url2 = extInput ? extInput.value.trim() : '';
     const key = apiKeyInput.value.trim();
@@ -271,14 +239,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    chrome.storage.local.get("config", (result) => {
-      const config = result.config || {};
-      config.jellyfin_urls = urls;
-      config.jellyfin_api_key = key;
-      chrome.storage.local.set({ config }, () => {
-        showStatus("status", TRANSLATIONS[currentLang].saved, "success");
-      });
-    });
+    if (await saveSettings({ jellyfin_urls: [url1, url2], jellyfin_api_key: key }, null, 'status')) {
+      showStatus("status", TRANSLATIONS[currentLang].saved, "success");
+    }
   });
 
   // Test server connection
@@ -309,7 +272,7 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // Save Telegram config
-  saveTgBtn?.addEventListener("click", () => {
+  saveTgBtn?.addEventListener("click", async () => {
     const bot = tgTokenInput.value.trim();
     const chat = tgChatInput.value.trim();
 
@@ -318,14 +281,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    chrome.storage.local.get("config", (result) => {
-      const config = result.config || {};
-      config.telegram_bot_token = bot;
-      config.telegram_chat_id = chat;
-      chrome.storage.local.set({ config }, () => {
-        showStatus("status-tg", TRANSLATIONS[currentLang].saved, "success");
-      });
-    });
+    if (await saveSettings({ telegram_bot_token: bot, telegram_chat_id: chat }, null, 'status-tg')) {
+      showStatus("status-tg", TRANSLATIONS[currentLang].saved, "success");
+    }
   });
 
   // Test Telegram connection

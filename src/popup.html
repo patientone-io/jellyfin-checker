@@ -368,18 +368,18 @@
   <!-- TAB 1: SERVER CONFIG -->
   <div class="tab-content active" id="tab-server">
     <div class="field">
-      <label class="label" data-i18n="urlLabel">Jellyfin URL #1</label>
+      <label class="label" data-i18n="urlLabel" for="jellyfin-url">Jellyfin URL #1</label>
       <input type="text" id="jellyfin-url" class="input" placeholder="http://localhost:8096">
     </div>
     
     <div class="field">
-      <label class="label" data-i18n="urlLabelExt">Jellyfin URL #2</label>
+      <label class="label" data-i18n="urlLabelExt" for="jellyfin-url-external">Jellyfin URL #2</label>
       <input type="text" id="jellyfin-url-external" class="input" placeholder="https://jellyfin.example.com">
-      <p class="hint" id="hint-api">Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada</p>
+      <p class="hint" id="hint-api">Drugi URL opcjonalny - używany gdy pierwszy nie odpowiada</p>
     </div>
     
     <div class="field">
-      <label class="label" data-i18n="keyLabel">Klucz API</label>
+      <label class="label" data-i18n="keyLabel" for="jellyfin-api-key">Klucz API</label>
       <input type="password" id="jellyfin-api-key" class="input" placeholder="••••••••">
       <p class="hint" id="hint-key">Jellyfin → Dashboard → Ustawienia → Klucze API</p>
     </div>
@@ -389,7 +389,7 @@
       <button id="test-btn" class="button" style="background:var(--btn-test);color:#fff" data-i18n="testBtn">Test połączenia</button>
     </div>
     
-    <div id="status" class="status"></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
   </div>
 
   <!-- TAB 2: OPTIONS & TELEGRAM -->
@@ -397,22 +397,22 @@
     <!-- Toggles -->
     <div class="toggle-row">
       <div class="toggle-info">
-        <div class="toggle-label" data-i18n="toggleSound">Powiadomienia dźwiękowe</div>
+        <div id="toggle-sound-label" class="toggle-label" data-i18n="toggleSound">Powiadomienia dźwiękowe</div>
         <div class="toggle-sub" data-i18n="toggleSoundSub">Piszcz przy znalezieniu pozycji</div>
       </div>
       <label class="switch">
-        <input type="checkbox" id="toggle-sound">
+        <input type="checkbox" id="toggle-sound" aria-labelledby="toggle-sound-label">
         <span class="slider"></span>
       </label>
     </div>
 
     <div class="toggle-row">
       <div class="toggle-info">
-        <div class="toggle-label" data-i18n="toggleRequest">Przycisk „Poproś o dodanie”</div>
+        <div id="toggle-request-label" class="toggle-label" data-i18n="toggleRequest">Przycisk „Poproś o dodanie”</div>
         <div class="toggle-sub" data-i18n="toggleRequestSub">Pokazuj gdy film nie jest na Jellyfin</div>
       </div>
       <label class="switch">
-        <input type="checkbox" id="toggle-request">
+        <input type="checkbox" id="toggle-request" aria-labelledby="toggle-request-label">
         <span class="slider"></span>
       </label>
     </div>
@@ -421,13 +421,13 @@
 
     <!-- Telegram Configuration -->
     <div class="field">
-      <label class="label" data-i18n="tgTokenLabel">Telegram Bot Token</label>
+      <label class="label" data-i18n="tgTokenLabel" for="telegram-bot-token">Telegram Bot Token</label>
       <input type="password" id="telegram-bot-token" class="input" placeholder="123456:ABC-DEF...">
       <p class="hint" id="hint-bot">Stwórz bota przez @BotFather → /newbot</p>
     </div>
 
     <div class="field">
-      <label class="label" data-i18n="tgChatLabel">Telegram Chat ID</label>
+      <label class="label" data-i18n="tgChatLabel" for="telegram-chat-id">Telegram Chat ID</label>
       <input type="text" id="telegram-chat-id" class="input" placeholder="-1001234567890">
       <p class="hint" id="hint-chat">ID czatu lub grupy (np. -1001234567890)</p>
     </div>
@@ -437,14 +437,15 @@
       <button id="test-tg-btn" class="button" style="background:var(--btn-test);color:#fff" data-i18n="testTgBtn">Test Telegram</button>
     </div>
 
-    <div id="status-tg" class="status"></div>
+    <div id="status-tg" class="status" role="status" aria-live="polite"></div>
   </div>
   
   <div class="footer">
-    <span>v1.0.3</span>
+    <span>v1.0.4</span>
     <a href="#" id="open-options" data-i18n="fullOptionsLink">Pełne okno opcji ↗</a>
   </div>
   
+  <script src="settings.js"></script>
   <script src="popup.js"></script>
 </body>
 </html>

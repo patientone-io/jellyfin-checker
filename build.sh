@@ -1,5 +1,7 @@
 #!/bin/bash
-set -e
+set -euo pipefail
+
+cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
 build_target() {
   local target="$1"
@@ -10,7 +12,9 @@ build_target() {
   mkdir -p "$dist"
 
   # Copy shared source files
-  cp -r "$src"/* "$dist/"
+  for file in background.js content.js settings.js popup.js options.js popup.html options.html config.json icon16.png icon48.png icon96.png icon128.png; do
+    cp "$src/$file" "$dist/"
+  done
 
   # Copy browser-specific manifest
   cp "$target/manifest.json" "$dist/manifest.json"

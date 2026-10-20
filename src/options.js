@@ -11,7 +11,7 @@ const TRANSLATIONS = {
     keyLabel: "Klucz API",
     labelBotToken: "Bot Token",
     labelChatId: "Chat ID",
-    hintApi: "Drugi URL opcjonalny — używany gdy pierwszy nie odpowiada",
+    hintApi: "Drugi URL opcjonalny - używany gdy pierwszy nie odpowiada",
     hintKey: "Jellyfin → Dashboard → Ustawienia → Klucze API → Dodaj klucz",
     hintBot: "Stwórz bota przez @BotFather → /newbot",
     hintChatBefore: "ID Twojego czatu lub grupy (np. ",
@@ -49,7 +49,7 @@ const TRANSLATIONS = {
     keyLabel: "API Key",
     labelBotToken: "Bot Token",
     labelChatId: "Chat ID",
-    hintApi: "Second URL is optional — used when the first is unreachable",
+    hintApi: "Second URL is optional - used when the first is unreachable",
     hintKey: "Jellyfin → Dashboard → Settings → API Keys → Add API Key",
     hintBot: "Create a bot via @BotFather → /newbot",
     hintChatBefore: "Your chat or group ID (e.g. ",
@@ -106,14 +106,13 @@ function applyTheme(theme) {
 
 function saveTheme(theme) {
   applyTheme(theme);
-  chrome.storage.local.get("config", (result) => {
-    const config = result.config || {};
-    chrome.storage.local.set({ config: { ...config, theme } });
-  });
+  saveSettings({ theme });
 }
 
-function setLanguage(lang) {
+function setLanguage(lang, persist = true) {
+  lang = Object.hasOwn(TRANSLATIONS, lang) ? lang : detectBrowserLang();
   currentLang = lang;
+  document.documentElement.lang = lang;
   const t = TRANSLATIONS[lang];
   document.getElementById("subtitle").textContent = t.subtitle;
   document.querySelector("[data-i18n='headingServer']").textContent = t.headingServer;
@@ -145,12 +144,9 @@ function setLanguage(lang) {
   // Highlight active lang button
   document.getElementById("lang-pl").classList.toggle("active", lang === "pl");
   document.getElementById("lang-en").classList.toggle("active", lang === "en");
-  document.title = t.subtitle + " — Jellyfin Checker";
+  document.title = t.subtitle + " - Jellyfin Checker";
   // Save to config
-  chrome.storage.local.get("config", (result) => {
-    const config = result.config || {};
-    chrome.storage.local.set({ config: { ...config, language: lang } });
-  });
+  if (persist) saveSettings({ language: lang });
 }
 
 function showStatus(id, message, type) {
@@ -183,7 +179,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (config.telegram_chat_id) telegramChatIdInput.value = config.telegram_chat_id;
 
   currentLang = config.language || detectBrowserLang();
-  setLanguage(currentLang);
+  setLanguage(currentLang, false);
   applyTheme(config.theme || "system");
 
   // Load toggle states
@@ -194,18 +190,10 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // Toggle change → auto-save
   if (toggleSound) {
-    toggleSound.addEventListener("change", async () => {
-      const cfg = (await chrome.storage.local.get("config")).config || {};
-      cfg.enable_sound_notifications = toggleSound.checked;
-      await chrome.storage.local.set({ config: cfg });
-    });
+    toggleSound.addEventListener("change", () => saveSettings({ enable_sound_notifications: toggleSound.checked }));
   }
   if (toggleRequest) {
-    toggleRequest.addEventListener("change", async () => {
-      const cfg = (await chrome.storage.local.get("config")).config || {};
-      cfg.enable_request_button = toggleRequest.checked;
-      await chrome.storage.local.set({ config: cfg });
-    });
+    toggleRequest.addEventListener("change", () => saveSettings({ enable_request_button: toggleRequest.checked }));
   }
 
   // Language buttons
@@ -218,27 +206,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.getElementById("theme-light")?.addEventListener("click", () => saveTheme("light"));
 
   // Auto-save on typing in options as well
-  function autoSaveOptions() {
-    const u1 = urlInput.value.trim();
-    const u2 = urlExtInput ? urlExtInput.value.trim() : '';
-    const key = apiKeyInput.value.trim();
-    const bot = telegramTokenInput.value.trim();
-    const chat = telegramChatIdInput.value.trim();
-    chrome.storage.local.get("config", (result) => {
-      const cfg = result.config || {};
-      cfg.jellyfin_urls = [u1, u2].filter(Boolean);
-      cfg.jellyfin_api_key = key;
-      cfg.telegram_bot_token = bot;
-      cfg.telegram_chat_id = chat;
-      chrome.storage.local.set({ config: cfg });
-    });
-  }
-
-  urlInput.addEventListener("input", autoSaveOptions);
-  if (urlExtInput) urlExtInput.addEventListener("input", autoSaveOptions);
-  apiKeyInput.addEventListener("input", autoSaveOptions);
-  telegramTokenInput.addEventListener("input", autoSaveOptions);
-  telegramChatIdInput.addEventListener("input", autoSaveOptions);
+  const textFields = [
+    [urlInput, "jellyfin_urls", 0],
+    [urlExtInput, "jellyfin_urls", 1],
+    [apiKeyInput, "jellyfin_api_key"],
+    [telegramTokenInput, "telegram_bot_token"],
+    [telegramChatIdInput, "telegram_chat_id"]
+  ];
+  bindSettingsFields(textFields);
 
   // Save
   saveBtn.addEventListener("click", async () => {
@@ -250,40 +225,23 @@ document.addEventListener("DOMContentLoaded", async () => {
     const apiKey = apiKeyInput.value.trim();
     const urls = [url1, url2].filter(Boolean);
 
-    const config = {
-      jellyfin_urls: urls,
-      jellyfin_api_key: apiKey,
-      telegram_bot_token: telegramTokenInput.value.trim(),
-      telegram_chat_id: telegramChatIdInput.value.trim(),
-      language: currentLang || "en",
-      enable_request_button: document.getElementById("toggle-request")?.checked ?? false,
-      enable_sound_notifications: document.getElementById("toggle-sound")?.checked ?? false
-    };
+    const config = { jellyfin_urls: [url1, url2], jellyfin_api_key: apiKey };
 
     if (urls.length === 0 || !apiKey) {
       showStatus("status-jf", TRANSLATIONS[currentLang].fillFields, "error");
       return;
     }
 
-    try {
-      const { config: existing = {} } = await chrome.storage.local.get("config");
-      await chrome.storage.local.set({ config: { ...existing, ...config } });
+    if (await saveSettings(config, null, 'status-jf')) {
       showStatus("status-jf", TRANSLATIONS[currentLang].saved, "success");
-    } catch (e) {
-      showStatus("status-jf", TRANSLATIONS[currentLang].saveErr.replace("{{e}}", e.message), "error");
     }
   });
 
   // Save Telegram
   saveTgBtn.addEventListener("click", async () => {
-    const cfg = (await chrome.storage.local.get("config")).config || {};
-    cfg.telegram_bot_token = telegramTokenInput.value.trim();
-    cfg.telegram_chat_id = telegramChatIdInput.value.trim();
-    try {
-      await chrome.storage.local.set({ config: cfg });
+    if (await saveSettings({ telegram_bot_token: telegramTokenInput.value.trim(),
+      telegram_chat_id: telegramChatIdInput.value.trim() }, null, 'status-tg')) {
       showStatus("status-tg", TRANSLATIONS[currentLang].savedTg, "success");
-    } catch (e) {
-      showStatus("status-tg", TRANSLATIONS[currentLang].saveErr.replace("{{e}}", e.message), "error");
     }
   });
 
