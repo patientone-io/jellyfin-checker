@@ -8,6 +8,7 @@
 
 ![version](https://img.shields.io/badge/version-1.0.4-blue)
 [![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-v1.0.4-blue?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)
+[![Firefox Add-on](https://img.shields.io/badge/Firefox_Add--on-v1.0.4-orange?logo=firefox-browser&logoColor=white)](https://addons.mozilla.org/addon/jellyfin-checker/)
 
 ---
 
@@ -54,11 +55,13 @@ A browser extension that checks in real time whether movies, TV shows, or people
 
 ### Installation
 
-#### Chrome / Brave / Edge (Recommended)
-
+#### Chrome / Brave / Edge
 Install directly from the **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
 
-#### Manual installation (Firefox 142+ / Developer mode)
+#### Firefox
+Install directly from **[Firefox Add-ons (AMO)](https://addons.mozilla.org/addon/jellyfin-checker/)**.
+
+#### Manual installation (Developer mode)
 
 1. Clone this repository and build the packages:
    ```bash
@@ -68,7 +71,7 @@ Install directly from the **[Chrome Web Store](https://chromewebstore.google.com
    ```
 2. Load the extension in your browser:
    - **Chrome / Brave / Edge:** open `chrome://extensions` (or `brave://extensions` / `edge://extensions`), enable **Developer mode**, click **Load unpacked**, and select `dist/chrome`.
-   - **Firefox 142+:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and select `dist/firefox/manifest.json` (temporary add-ons are removed when Firefox restarts; see [Mozilla's guide](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)).
+   - **Firefox:** open `about:debugging#/runtime/this-firefox`, click **Load Temporary Add-on**, and select `dist/firefox/manifest.json` (temporary add-ons are removed when Firefox restarts; see [Mozilla's guide](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)).
 
 > **Note:** If you also use Tampermonkey/Violentmonkey, install only one Checker variant (either the browser extension or `jellyfin-checker.user.js`) to avoid duplicate badges on the page.
 
@@ -233,11 +236,13 @@ Rozszerzenie przeglądarki, które w czasie rzeczywistym sprawdza, czy przegląd
 
 ### Instalacja
 
-#### Chrome / Brave / Edge (Zalecane)
-
+#### Chrome / Brave / Edge
 Zainstaluj bezpośrednio z **[Chrome Web Store](https://chromewebstore.google.com/detail/jellyfin-checker/llbfpbeiiidailfdcbdeilmonlikdoef)**.
 
-#### Instalacja ręczna (Firefox 142+ / Tryb deweloperski)
+#### Firefox
+Zainstaluj bezpośrednio z **[Firefox Add-ons (AMO)](https://addons.mozilla.org/addon/jellyfin-checker/)**.
+
+#### Instalacja ręczna (Tryb deweloperski)
 
 1. Sklonuj repozytorium i zbuduj paczki:
    ```bash
@@ -247,7 +252,7 @@ Zainstaluj bezpośrednio z **[Chrome Web Store](https://chromewebstore.google.co
    ```
 2. Wczytaj rozszerzenie w przeglądarce:
    - **Chrome / Brave / Edge:** otwórz stronę rozszerzeń (`chrome://extensions`, `brave://extensions` lub `edge://extensions`), włącz **Tryb programisty**, kliknij **Wczytaj rozpakowane** i wskaż katalog `dist/chrome`.
-   - **Firefox 142+:** otwórz `about:debugging#/runtime/this-firefox`, kliknij **Wczytaj tymczasowy dodatek** i wskaż plik `dist/firefox/manifest.json` (dodatek tymczasowy działa do zamknięcia Firefoksa — zobacz [instrukcję Mozilli](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)).
+   - **Firefox:** otwórz `about:debugging#/runtime/this-firefox`, kliknij **Wczytaj tymczasowy dodatek** i wskaż plik `dist/firefox/manifest.json` (dodatek tymczasowy działa do zamknięcia Firefoksa — zobacz [instrukcję Mozilli](https://extensionworkshop.com/documentation/develop/temporary-installation-in-firefox/)).
 
 > **Wskazówka:** Jeśli korzystasz również z Tampermonkey/Violentmonkey, używaj tylko jednego wariantu Checkera (albo rozszerzenia, albo skryptu `jellyfin-checker.user.js`), aby na stronie nie wyświetlały się dwa podwójne statusy.
 

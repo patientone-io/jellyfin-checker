@@ -62,7 +62,7 @@ W tym katalogu znajdują się dwa niezależne skrypty dla menedżerów **Tamperm
 1. **[`jellyfin-checker.user.js`](jellyfin-checker.user.js) (v1.0.4)** — skryptowy odpowiednik rozszerzenia przeglądarkowego. Sprawdza dostępność filmów, seriali, sezonów, odcinków i osób w Twoim Jellyfinie podczas przeglądania **Filmwebu**, **IMDb** oraz **TMDb**.
 2. **[`jellyfin-to-filmweb.user.js`](jellyfin-to-filmweb.user.js) (v1.4.1)** — odwrotny mostek integracji: dodaje stylowy przycisk **„Filmweb”** bezpośrednio w webowym interfejsie **Jellyfina** (obok przycisków Odtwórz i Zwiastun) na stronach filmów, seriali, sezonów i odcinków.
 
-> **Ważne:** W jednej przeglądarce używaj tylko jednego wariantu Checkera (albo rozszerzenia z Chrome Web Store, albo skryptu `jellyfin-checker.user.js`), aby uniknąć podwójnych plakietek statusu. Skrypt `jellyfin-to-filmweb.user.js` działa w interfejsie Jellyfina, więc możesz go używać razem z dowolnym wariantem Checkera.
+> **Ważne:** W jednej przeglądarce używaj tylko jednego wariantu Checkera (albo rozszerzenia z Chrome Web Store / Firefox Add-ons, albo skryptu `jellyfin-checker.user.js`), aby uniknąć podwójnych plakietek statusu. Skrypt `jellyfin-to-filmweb.user.js` działa w interfejsie Jellyfina, więc możesz go używać razem z dowolnym wariantem Checkera.
 
 ### 🚀 Instalacja
 
